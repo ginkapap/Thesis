@@ -69,7 +69,6 @@ ggplot(py$df4 , aes(x= 二一次數,y=人數)) + geom_bar(stat="identity") + coo
 ### 累計被當比例
 同學會被二一最直接連想的為此為同學歷年來的修課狀況與紀錄，在此新增變數分別為；累計必修被當比例、累計選修被當比例以及累計通識被當比例作為捕捉修課面向的特徵，選擇比例而非堂數的原因可由<表X>看出；各系對於必選修與通識上的要求並不一樣固使用比例。
 
-
 ```{python}
 #刪掉所有系級年級數並保留法律系各組
 df['系別'] = np.where(df['系級'].astype(str).str[0] == '法',df['系級'].str[:-1],df['系別'])
@@ -101,11 +100,23 @@ dfclass1 = dfclass1.groupby(['系別'])['必修數'].median().reset_index(name =
 dfclass1 = dfclass1[dfclass1['系別'].str[0] != "("]
 ```
 ```{r results="asis"}
-py$dfclass1%>% DT::datatable()
+py$dfclass1_1_1%>% DT::datatable()
 ```
 
 
 上表可知每系的必修課開課狀況不一樣，故在此使用比例來計算。
+
+```{python}
+#整理df刪除多餘行
+#df=df.drop(['Unnamed: 0','index','科目名稱','授課語言','上課時間及教室','mainstudent','mainnumber','mainQ2/3'],axis=1)
+#必修不及格各學期狀況
+df['不及格']=np.where(df['學期成績'] < 60 , 1 , 0)
+dfclass1_1=df[df['必選修類別（必／選／通）'] == '必']
+dfclass1_1_1=dfclass1_1.groupby(['學號','學年','學期'])['不及格'].sum().reset_index(name = '必修被當')
+dfclass1_1_1['累積必修被當'] =dfclass1_1_1.groupby(['學號'])['必修被當'].apply(lambda x: x.cumsum())
+df = pd.merge(df,dfclass1_1_1,on=['學號','學年','學期'],how='left')
+```
+
 
 ### 累計外系修課狀況
 外系的修課狀況是否也會影響到二一的預測也是我們想知道的，固加入變數之中，藉由累計外系修課數，觀察同學在於外系修課的狀況，由表X知道各系會因為規定不同，導致外系修課數有所不同，所以在此我們做標準化處理（減班平均處以班標準差）。
