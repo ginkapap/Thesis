@@ -69,31 +69,41 @@ ggplot(py$df4 , aes(x= 二一次數,y=人數)) + geom_bar(stat="identity") + coo
 ### 累計被當比例
 同學會被二一最直接連想的為此為同學歷年來的修課狀況與紀錄，在此新增變數分別為；累計必修被當比例、累計選修被當比例以及累計通識被當比例作為捕捉修課面向的特徵，選擇比例而非堂數的原因可由<表X>看出；各系對於必選修與通識上的要求並不一樣固使用比例。
 
+
 ```{python}
-#法律系合併
-df11 = pd.DataFrame(df)
-df11['系級tem'] = df['開課系所'].str[:4]
-a = []
-for i in range(len(df11)):
-    if df11['系級tem'][i] == "法律學系":
-        a.append("法律學系")
-    else:
-        a.append(df['開課系所'][i])
-df['開課系別'] = a
-df = df.drop(['系級tem'], axis=1)
-#排除本科系開給外科系的必修課
-df5 = df[df['必選修類別（必／選／通）'] == '必']
-df5 = df5[df5['開課系別'] == df5['系別']]
+#刪掉所有系級年級數並保留法律系各組
+df['系別'] = np.where(df['系級'].astype(str).str[0] == '法',df['系級'].str[:-1],df['系別'])
+df['班別'] = df['班別'].fillna('無')
+```
+```{python}
+#入學年
+df['入學年'] = df['學號'].astype(str).str[1:4]
+#計算各班人數
+dfnum = df.groupby(['系別','入學年','學號','班別']).size().reset_index()
+dfnum = dfnum.groupby(['系別','入學年','學號','班別']).size().reset_index(name = 'x').groupby(['系別','入學年','班別'])['x'].sum().reset_index(name = '該班人數')
+df = pd.merge(df,dfnum,on=['系別','入學年','班別'],how='left')
 #將體育課名統一化
-df5['名稱'] = np.where(df5['科目名稱'].str[:2] == '體育', '體育',df5['科目名稱'])
-#製作中位數
-df6 = df5.groupby(['系別','學年','學期','名稱']).size().reset_index()
-df7 = df6.groupby(['系別','學年','學期'])['名稱'].count().reset_index(name = '必修開課數')
-df8 = df7.groupby(['系別'])['必修開課數'].median().reset_index(name = '必修開課數中位數')
+df['名稱'] = np.where(df['科目名稱'].str[:2] == '體育', '體育',df['科目名稱'])
+```
+#計算必修中位數
+```{python}
+#計算各科目中各班幾人修
+df5 = df[df['必選修類別（必／選／通）']=='必']
+df5_1 = df5.groupby(['系別','名稱','入學年','班別']).size().reset_index(name = '該班幾人修')
+df5 = pd.merge(df5,df5_1,on=['系別','名稱','入學年','班別'],how='left')
+#若該班修課人數>該班人數的九成則那門課算為必修課
+df5['是否為必修'] = np.where(df5['該班幾人修'] >= df5['該班人數'] *0.9 , 1 , 0)
+#計算每人必修課數-> 各班中位數
+dfclass1 = df5.groupby(['系別','入學年','學號'])['是否為必修'].sum().reset_index(name = '必修數').groupby(['系別','入學年'])['必修數'].median().reset_index(name = '必修數')
+#去除掉98、99、進修部後計算各系中位數
+dfclass1 = dfclass1[dfclass1['入學年'].str[0] != '9']
+dfclass1 = dfclass1.groupby(['系別'])['必修數'].median().reset_index(name = '必修中位數')
+dfclass1 = dfclass1[dfclass1['系別'].str[0] != "("]
 ```
 ```{r results="asis"}
-py$df8%>% DT::datatable()
+py$dfclass1%>% DT::datatable()
 ```
+
 
 上表可知每系的必修課開課狀況不一樣，故在此使用比例來計算。
 
@@ -101,6 +111,11 @@ py$df8%>% DT::datatable()
 外系的修課狀況是否也會影響到二一的預測也是我們想知道的，固加入變數之中，藉由累計外系修課數，觀察同學在於外系修課的狀況，由表X知道各系會因為規定不同，導致外系修課數有所不同，所以在此我們做標準化處理（減班平均處以班標準差）。
 
 <表 顯示各系外系修課數>
+
+```{python}
+
+```
+
 
 ### 必修/選修/通識成績表現（pr）（怕會跟累計被當比例用共線的問題，待討論）
 ## 同儕面向
