@@ -62,13 +62,14 @@ df2['是否被二一'] = np.where(df2['實拿學分']/df2['學分數'] <= 1/2 ,1
 df3 = df2[df2['是否被二一'] == 1]
 df3 = df3.groupby('學號').size().reset_index(name = '二一次數')
 df4 = df3.groupby('二一次數').size().reset_index(name = '人數')
+#print(df.groupby(['學號']).size().reset_index())
 ```
 ```{r results="asis"}
 py$df4 %>% kable() %>% kable_styling(full_width = F)
 ggplot(py$df4 , aes(x= 二一次數,y=人數)) + geom_bar(stat="identity") + coord_flip()
 ```
 
-從99學年度起至107學年度中，共有645511筆學生於不同學期的資料，其中學生被二一的紀錄有1283筆，由上表可知在被二一的同學之中被二一壹次的紀錄最多筆，共有716筆，被二一兩次的有200筆；三次以上則有44筆。
+從99學年度起至106學年度中，共有4284位學生資料，其中學生被二一的紀錄有180筆，由上表可知在被二一的同學之中被二一壹次的紀錄最多筆，共有158筆，被二一兩次的有16筆；三次以上則有6筆。
 
 ```{python}
 #print(df.groupby(['學號']).size().reset_index())
@@ -104,6 +105,7 @@ df['ClassId'] = df['名稱'] + df['學年'].astype(str) + df['學期'].astype(st
 ###計算各系必修中位數
 
 各同學成績單中所顯示的必修課為該同學自己的必修課；及表示可能會受該同學因有修教育學分、雙主修等因素影響而無法反應該系真實必修狀況，故在此建立新的必修的算法，將同入學年且同班別系級的同學定義為同班，利用同班中若有一半以的同學修該門必修課則列入必修課。
+必修中位數算法為先算出各班的必修中位數在以系作平均。
 
 ```{python}
 #計算各科目中各班幾人修
@@ -124,7 +126,7 @@ df = pd.merge(df,dfclass1,on=['系別','入學年','學號'],how='left')
 dfclass11 = dfclass1.groupby(['系別','入學年'])['個人必修數'].median().reset_index(name = '班中位數')
 #去除掉98、99、進修部後計算各系中位數
 dfclass11 = dfclass11[dfclass11['入學年'].str[0] != '9']
-dfclass11 = dfclass11.groupby(['系別'])['班中位數'].median().reset_index(name = '必修中位數')
+dfclass11 = dfclass11.groupby(['系別'])['班中位數'].mean().reset_index(name = '必修中位數')
 dfclass11 = dfclass11[dfclass1['系別'].str[0] != "("]
 ```
 ```{python}
@@ -151,36 +153,34 @@ py$dfclass11%>% DT::datatable()
 
 ###計算各系選修中位數
 
-```{python}
-#計算各科目中各班幾人修
-#僅計算必修且班級人數要有20人以上
-#df5 = df[df['入學年'] == '103']
-df5 = df[df['必選修類別（必／選／通）']=='必']
-#df5 = df[df['該班人數'] >= 20]
-df5_1 = df5.groupby(['ClassId','系別','入學年','班別']).size().reset_index(name = '該班幾人修此課')
-#print(df5_1)
-df5 = pd.merge(df5,df5_1,on=['ClassId','系別','入學年','班別'],how='left')
-#若該班修課人數>該班人數的5成則那門課算為必修課
-df5['是否為必修'] = np.where((df5['該班幾人修此課']/df5['該班人數']) >= 0.5 , 1 , 0)
-```
+選修中位數算法為先算出各班的必修中位數在以系作平均。
 
 ```{python}
 #計算每人必修課數、 各班中位數
-dfclass1 = df5.groupby(['系別','入學年','學號'])['是否為必修'].sum().reset_index(name = '個人必修數')
-df = pd.merge(df,dfclass1,on=['系別','入學年','學號'],how='left')
-dfclass11 = dfclass1.groupby(['系別','入學年'])['個人必修數'].median().reset_index(name = '班中位數')
-#去除掉98、99、進修部後計算各系中位數
-dfclass11 = dfclass11[dfclass11['入學年'].str[0] != '9']
-dfclass11 = dfclass11.groupby(['系別'])['班中位數'].median().reset_index(name = '必修中位數')
-dfclass11 = dfclass11[dfclass1['系別'].str[0] != "("]
+dfclass2 = df[df['必選修類別（必／選／通）'] == '選']
+dfclass2 = dfclass2.groupby(['系別','入學年','班別','學號']).size().reset_index(name = '個人選修數')
+dfclass2 = dfclass2.groupby(['系別','入學年','班別'])['個人選修數'].median().reset_index(name = '班選修中位數')
+dfclass2 = dfclass2.groupby(['系別'])['班選修中位數'].mean().reset_index(name = '選修中位數')
 ```
 
 ```{r results="asis"}
-py$dfclass11%>% DT::datatable()
+py$dfclass2%>% DT::datatable()
 ```
 
-
-
+```{python}
+#貼上特徵
+#選修不及格各學期狀況
+dfclass2_1=df[df['必選修類別（必／選／通）'] == '選']
+dfclass2_1_1=dfclass2_1.groupby(['學號','學年','學期'])['不及格'].sum().reset_index(name = '選修被當')
+dfclass2_1_1['累積選修被當'] =dfclass2_1_1.groupby(['學號'])['選修被當'].apply(lambda x: x.cumsum())
+dfclass2_1_2=dfclass2_1.groupby(['學號','學年','學期']).size().reset_index(name = '當學期選修修課數')
+dfclass2_1_2['累積選修修課數'] =dfclass2_1_2.groupby(['學號'])['當學期選修修課數'].apply(lambda x: x.cumsum())
+dfclass2_1_3=pd.merge(dfclass2_1_2,dfclass2_1_1,on = ['學號','學年','學期'])
+dfclass2_1_3['累積選修被當比'] = dfclass2_1_3['累積選修被當'] / dfclass2_1_3['累積選修修課數']
+dfclass2_1_3 = dfclass2_1_3.drop(['當學期選修修課數','累積選修修課數','選修被當','累積選修被當'],axis =1)
+df=pd.merge(df,dfclass2_1_3,on = ['學號','學年','學期'])
+```
+(出現99年入學原因為49972139 晚讀99入學年100年開始修課)
 
 
 
