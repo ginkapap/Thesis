@@ -125,7 +125,7 @@ df5['是否為必修'] = np.where((df5['該班幾人修此課']/df5['該班人�
 dfclass1 = df5.groupby(['系別','入學年','學號'])['是否為必修'].sum().reset_index(name = '個人必修數')
 df = pd.merge(df,dfclass1,on=['系別','入學年','學號'],how='left')
 dfclass11 = dfclass1.groupby(['系別','入學年'])['個人必修數'].median().reset_index(name = '班中位數')
-
+dfclass11 = dfclass11.groupby(['系別'])['班中位數'].mean().reset_index(name = '必修中位數')
 ```
 
 ```{python}
