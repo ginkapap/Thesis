@@ -46,7 +46,7 @@ use_condaenv("ginkapap")
 
 ## 被解釋變數
 
-原始資料為99年至106年學生各科成績分數資料，在此先排除修課學期不滿八學期者及僅使用學生有完整修過四年以上的課程作為本篇使用資料，資料中並無顯示二一紀錄，在此建立被解釋變數“是否被二一”行。
+原始資料為99年至106年學生各科成績分數資料，在此先排除修課學期不滿八學期者及僅使用100年到103年入學且有完整8學期資料者為本篇使用資料，資料中並無顯示二一紀錄，在此建立被解釋變數“是否被二一”行。
 
 ```{python}
 import pandas as pd
@@ -58,12 +58,11 @@ df['實拿學分'] = np.where(df['學期成績'] >= 60, df['學分數'], 0)
 dftest = pd.DataFrame(df.groupby(['學號',"學期",'學年']).size().reset_index())
 dftest = pd.DataFrame(dftest.groupby(['學號']).size().reset_index(name='修課幾學期'))
 dfcomplete = pd.merge(df,dftest,on='學號') 
-df = dfcomplete[dfcomplete['修課幾學期'] == 8]
-
+df = dfcomplete[dfcomplete['修課幾學期'] >= 8]
 df2 = df.groupby(['學號','學年','學期'])['實拿學分','學分數'].sum().reset_index()
 df2['是否被二一'] = np.where(df2['實拿學分']/df2['學分數'] <= 1/2 ,1 ,0)
 df3 = df2[df2['是否被二一'] == 1]
-df3 = df3.groupby('學號').size().reset_index(name = '二一次數')
+df3 = df3.groupby(['學號']).size().reset_index(name = '二一次數')
 df4 = df3.groupby('二一次數').size().reset_index(name = '人數')
 #print(df.groupby(['學號']).size().reset_index())
 ```
@@ -73,7 +72,7 @@ py$df4 %>% DT::datatable()
 ggplot(py$df4 , aes(x= 二一次數,y=人數)) + geom_bar(stat="identity") + coord_flip()
 ```
 
-從99學年度起至106學年度中，共有4284位學生資料，其中學生被二一的紀錄有180筆，由上表可知在被二一的同學之中被二一壹次的紀錄最多筆，共有158筆，被二一兩次的有16筆；三次以上則有6筆。
+從100學年度起至103學年度入學學生中，共有4949位學生資料，其中學生被二一的紀錄有366筆，由上表可知在被二一的同學之中被二一壹次的紀錄最多筆，共有297筆，被二一兩次的有46筆；三次以上則有23筆。
 
 ## 修課面向
 
@@ -141,7 +140,7 @@ dfclass1_1_3=pd.merge(dfclass1_1_2,dfclass1_1_1,on = ['學號','學年','學期'
 dfclass1_1_3['累積必修被當比'] = dfclass1_1_3['累積必修被當'] / dfclass1_1_3['累積必修修課數']
 dfclass1_1_3 = dfclass1_1_3.drop(['當學期必修修課數','累積必修修課數','必修被當','累積必修被當'],axis =1)
 #print(dfclass1_1_3)
-df=pd.merge(df,dfclass1_1_3,on = ['學號','學年','學期'])
+df=pd.merge(df,dfclass1_1_3,on = ['學號','學年','學期'],how='outer')
 ```
 
 ```{r results="asis"}
@@ -175,7 +174,7 @@ dfclass2_1_2['累積選修修課數'] =dfclass2_1_2.groupby(['學號'])['當學�
 dfclass2_1_3=pd.merge(dfclass2_1_2,dfclass2_1_1,on = ['學號','學年','學期'])
 dfclass2_1_3['累積選修被當比'] = dfclass2_1_3['累積選修被當'] / dfclass2_1_3['累積選修修課數']
 dfclass2_1_3 = dfclass2_1_3.drop(['當學期選修修課數','累積選修修課數','選修被當','累積選修被當'],axis =1)
-df=pd.merge(df,dfclass2_1_3,on = ['學號','學年','學期'])
+df=pd.merge(df,dfclass2_1_3,on = ['學號','學年','學期'],how='outer')
 ```
 
 ### 計算各系通識中位數
@@ -204,9 +203,17 @@ dfclass3_1_2['累積通識修課數'] =dfclass3_1_2.groupby(['學號'])['當學�
 dfclass3_1_3=pd.merge(dfclass3_1_2,dfclass3_1_1,on = ['學號','學年','學期'])
 dfclass3_1_3['累積通識被當比'] = dfclass3_1_3['累積通識被當'] / dfclass3_1_3['累積通識修課數']
 dfclass3_1_3 = dfclass3_1_3.drop(['當學期通識修課數','累積通識修課數','通識被當','累積通識被當'],axis =1)
-df=pd.merge(df,dfclass3_1_3,on = ['學號','學年','學期'])
+df=pd.merge(df,dfclass3_1_3,on = ['學號','學年','學期'],how='outer')
 ```
 
+＊＊檢查
+
+```{python}
+dk =(df.groupby(['系別','入學年','班別','學號']).size().reset_index().groupby(['系別','入學年','班別']).size().reset_index(name = 'num'))
+```
+```{r}
+py$dk%>% DT::datatable()
+```
 ### 累計外系修課狀況
 
 外系的修課狀況是否也會影響到二一的預測也是我們想知道的，故加入變數之中，藉由累計外系修課數，觀察同學在於外系修課的狀況，由表X知道各系會因為規定不同，導致外系修課數有所不同，所以在此我們做標準化處理（減班平均處以班標準差）。
