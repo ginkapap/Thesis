@@ -71,11 +71,6 @@ ggplot(py$df4 , aes(x= 二一次數,y=人數)) + geom_bar(stat="identity") + coo
 
 從99學年度起至106學年度中，共有4284位學生資料，其中學生被二一的紀錄有180筆，由上表可知在被二一的同學之中被二一壹次的紀錄最多筆，共有158筆，被二一兩次的有16筆；三次以上則有6筆。
 
-```{python}
-#print(df.groupby(['學號']).size().reset_index())
-```
-
-
 ## 修課面向
 ### 累計被當比例
 同學會被二一最直接連想的為此為同學歷年來的修課狀況與紀錄，在此新增變數分別為；累計必修被當比例、累計選修被當比例以及累計通識被當比例作為捕捉修課面向的特徵，選擇比例而非堂數的原因可由<表X>看出；各系對於必選修與通識上的要求並不一樣固使用比例。
@@ -124,11 +119,9 @@ df5['是否為必修'] = np.where((df5['該班幾人修此課']/df5['該班人�
 dfclass1 = df5.groupby(['系別','入學年','學號'])['是否為必修'].sum().reset_index(name = '個人必修數')
 df = pd.merge(df,dfclass1,on=['系別','入學年','學號'],how='left')
 dfclass11 = dfclass1.groupby(['系別','入學年'])['個人必修數'].median().reset_index(name = '班中位數')
-#去除掉98、99、進修部後計算各系中位數
-dfclass11 = dfclass11[dfclass11['入學年'].str[0] != '9']
-dfclass11 = dfclass11.groupby(['系別'])['班中位數'].mean().reset_index(name = '必修中位數')
-dfclass11 = dfclass11[dfclass1['系別'].str[0] != "("]
+
 ```
+
 ```{python}
 #貼上特徵
 #必修不及格各學期狀況
@@ -156,7 +149,7 @@ py$dfclass11%>% DT::datatable()
 選修中位數算法為先算出各班的必修中位數在以系作平均。
 
 ```{python}
-#計算每人必修課數、 各班中位數
+#計算每人選修課數、 各班中位數
 dfclass2 = df[df['必選修類別（必／選／通）'] == '選']
 dfclass2 = dfclass2.groupby(['系別','入學年','班別','學號']).size().reset_index(name = '個人選修數')
 dfclass2 = dfclass2.groupby(['系別','入學年','班別'])['個人選修數'].median().reset_index(name = '班選修中位數')
@@ -182,7 +175,30 @@ df=pd.merge(df,dfclass2_1_3,on = ['學號','學年','學期'])
 ```
 (出現99年入學原因為49972139 晚讀99入學年100年開始修課)
 
+```{python}
+#計算每人通識課數、 各班中位數
+dfclass3 = df[df['必選修類別（必／選／通）'] == '通']
+dfclass3 = dfclass3.groupby(['系別','入學年','班別','學號']).size().reset_index(name = '個人通識數')
+dfclass3 = dfclass3.groupby(['系別','入學年','班別'])['個人通識數'].median().reset_index(name = '班通識中位數')
+dfclass3 = dfclass3.groupby(['系別'])['班通識中位數'].mean().reset_index(name = '通識中位數')
+```
+```{r results="asis"}
+py$dfclass3%>% DT::datatable()
+```
 
+```{python}
+#貼上特徵
+#通識不及格各學期狀況
+dfclass3_1=df[df['必選修類別（必／選／通）'] == '通']
+dfclass3_1_1=dfclass3_1.groupby(['學號','學年','學期'])['不及格'].sum().reset_index(name = '通識被當')
+dfclass3_1_1['累積通識被當'] =dfclass3_1_1.groupby(['學號'])['通識被當'].apply(lambda x: x.cumsum())
+dfclass3_1_2=dfclass3_1.groupby(['學號','學年','學期']).size().reset_index(name = '當學期通識修課數')
+dfclass3_1_2['累積通識修課數'] =dfclass3_1_2.groupby(['學號'])['當學期通識修課數'].apply(lambda x: x.cumsum())
+dfclass3_1_3=pd.merge(dfclass3_1_2,dfclass3_1_1,on = ['學號','學年','學期'])
+dfclass3_1_3['累積通識被當比'] = dfclass3_1_3['累積通識被當'] / dfclass3_1_3['累積通識修課數']
+dfclass3_1_3 = dfclass3_1_3.drop(['當學期通識修課數','累積通識修課數','通識被當','累積通識被當'],axis =1)
+df=pd.merge(df,dfclass3_1_3,on = ['學號','學年','學期'])
+```
 
 ### 累計外系修課狀況
 外系的修課狀況是否也會影響到二一的預測也是我們想知道的，固加入變數之中，藉由累計外系修課數，觀察同學在於外系修課的狀況，由表X知道各系會因為規定不同，導致外系修課數有所不同，所以在此我們做標準化處理（減班平均處以班標準差）。
