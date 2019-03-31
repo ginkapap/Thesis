@@ -38,6 +38,33 @@ use_condaenv("ginkapap")
 #py_available()
 ```
 
+```{python}
+import pandas as pd
+import numpy as np
+df = pd.read_csv('~/Dropbox/M-Team/research-transcript-and-student-types/main_student2.csv')
+df['實拿學分'] = np.where(df['學期成績'] >= 60, df['學分數'], 0)
+#刪掉所有系級年級數並保留法律系各組
+df['系別'] = np.where(df['系級'].astype(str).str[0] == '法',df['系級'].str[:-1],df['系別'])
+df['班別'] = df['班別'].fillna('無')
+df['ClassId'] = df['科目名稱'] + df['學年'].astype(str) + df['學期'].astype(str)
+#入學年
+df['入學年'] = df['學號'].astype(str).str[1:4]
+#去掉修課不滿八學期者
+dftest = pd.DataFrame(df.groupby(['學號',"學期",'學年']).size().reset_index())
+dftest = pd.DataFrame(dftest.groupby(['學號']).size().reset_index(name='修課幾學期'))
+dfcomplete = pd.merge(df,dftest,on='學號') 
+df = dfcomplete[dfcomplete['修課幾學期'] >= 8]
+#秀出97、98年入學者資料有幾筆
+df9798 = df.groupby(['學號','入學年','系別']).size().reset_index(name='人數')
+df9798 = df9798.groupby(['入學年','系別']).size().reset_index(name='人數')
+```
+```{r results="asis"}
+py$df9798%>% DT::datatable()
+```
+
+觀察掉一些入學年9開頭的資料不完整，刪去這些年的資料。
+
+
 # 目的
 
 以往由老師發送期中預警給學生時通常學期已過一半，難以在學生遇到學習困難的初期給予協助，希望藉由二一預測系統能提早觀察出哪些學生是需要被特別關心的，藉由前幾學期的修課面向、同儕之間的關係面向、借書面向、欲預測學期的課程面向與老師面向；預測下一學期是否會被二一。
@@ -49,22 +76,11 @@ use_condaenv("ginkapap")
 原始資料為99年至106年學生各科成績分數資料，在此先排除修課學期不滿八學期者及僅使用100年到103年入學且有完整8學期資料者為本篇使用資料，資料中並無顯示二一紀錄，在此建立被解釋變數“是否被二一”行。
 
 ```{python}
-import pandas as pd
-import numpy as np
-df = pd.read_csv('~/Dropbox/M-Team/research-transcript-and-student-types/main_student2.csv')
-df['實拿學分'] = np.where(df['學期成績'] >= 60, df['學分數'], 0)
-
-#去掉修課不滿八學期者
-dftest = pd.DataFrame(df.groupby(['學號',"學期",'學年']).size().reset_index())
-dftest = pd.DataFrame(dftest.groupby(['學號']).size().reset_index(name='修課幾學期'))
-dfcomplete = pd.merge(df,dftest,on='學號') 
-df = dfcomplete[dfcomplete['修課幾學期'] >= 8]
 df2 = df.groupby(['學號','學年','學期'])['實拿學分','學分數'].sum().reset_index()
 df2['是否被二一'] = np.where(df2['實拿學分']/df2['學分數'] <= 1/2 ,1 ,0)
 df3 = df2[df2['是否被二一'] == 1]
 df3 = df3.groupby(['學號']).size().reset_index(name = '二一次數')
 df4 = df3.groupby('二一次數').size().reset_index(name = '人數')
-#print(df.groupby(['學號']).size().reset_index())
 ```
 ```{r results="asis"}
 py$df4 %>% DT::datatable()
@@ -80,15 +96,8 @@ ggplot(py$df4 , aes(x= 二一次數,y=人數)) + geom_bar(stat="identity") + coo
 
 同學會被二一最直接連想的為此為同學歷年來的修課狀況與紀錄，在此新增變數分別為；累計必修被當比例、累計選修被當比例以及累計通識被當比例作為捕捉修課面向的特徵，選擇比例而非堂數的原因可分別由<表X>看出；各系對於必選修與通識上的要求並不一樣故使用比例。
 
+
 ```{python}
-#刪掉所有系級年級數並保留法律系各組
-df['系別'] = np.where(df['系級'].astype(str).str[0] == '法',df['系級'].str[:-1],df['系別'])
-df['班別'] = df['班別'].fillna('無')
-df['ClassId'] = df['科目名稱'] + df['學年'].astype(str) + df['學期'].astype(str)
-```
-```{python}
-#入學年
-df['入學年'] = df['學號'].astype(str).str[1:4]
 #計算各班人數
 dfnum = df.groupby(['系別','入學年','學號','班別']).size().reset_index()
 #print(dfnum)
@@ -105,26 +114,22 @@ df['ClassId'] = df['名稱'] + df['學年'].astype(str) + df['學期'].astype(st
 ### 計算各系必修中位數
 
 各同學成績單中所顯示的必修課為該同學自己的必修課；及表示可能會受該同學因有修教育學分、雙主修等因素影響而無法反應該系真實必修狀況，故在此建立新的必修的算法，將同入學年且同班別系級的同學定義為同班，利用同班中若有一半以的同學修該門必修課則列入必修課。
-必修中位數算法為先算出各班的必修中位數在以系作平均。
 
 ```{python}
 #計算各科目中各班幾人修
 #僅計算必修且班級人數要有20人以上
-#df5 = df[df['入學年'] == '103']
 df5 = df[df['必選修類別（必／選／通）']=='必']
-#df5 = df[df['該班人數'] >= 20]
-df5_1 = df5.groupby(['ClassId','系別','入學年','班別']).size().reset_index(name = '該班幾人修此課')
-#print(df5_1)
-df5 = pd.merge(df5,df5_1,on=['ClassId','系別','入學年','班別'],how='left')
+df5_1 = df5.groupby(['ClassId','系別','入學年']).size().reset_index(name = '該班幾人修此課')
+df5 = pd.merge(df5,df5_1,on=['ClassId','系別','入學年'],how='left')
 #若該班修課人數>該班人數的5成則那門課算為必修課
-df5['是否為必修'] = np.where((df5['該班幾人修此課']/df5['該班人數']) >= 0.5 , 1 , 0)
+df5['是否為必修'] = np.where((df5['該班幾人修此課']/df5['該班人數']) >= 0.8 , 1 , 0)
 ```
 ```{python}
 #計算每人必修課數、 各班中位數
 dfclass1 = df5.groupby(['系別','入學年','學號'])['是否為必修'].sum().reset_index(name = '個人必修數')
 df = pd.merge(df,dfclass1,on=['系別','入學年','學號'],how='left')
 dfclass11 = dfclass1.groupby(['系別','入學年'])['個人必修數'].median().reset_index(name = '班中位數')
-dfclass11 = dfclass11.groupby(['系別'])['班中位數'].mean().reset_index(name = '必修中位數')
+#dfclass11 = dfclass11.groupby(['系別'])['班中位數'].mean().reset_index(name = '必修中位數')
 ```
 
 ```{python}
