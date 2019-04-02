@@ -45,6 +45,7 @@ df = pd.read_csv('~/Dropbox/M-Team/research-transcript-and-student-types/main_st
 df['實拿學分'] = np.where(df['學期成績'] >= 60, df['學分數'], 0)
 #刪掉所有系級年級數並保留法律系各組
 df['系別'] = np.where(df['系級'].astype(str).str[0] == '法',df['系級'].str[:-1],df['系別'])
+
 df['班別'] = df['班別'].fillna('無')
 df['ClassId'] = df['科目名稱'] + df['學年'].astype(str) + df['學期'].astype(str)
 #入學年
@@ -57,12 +58,15 @@ df = dfcomplete[dfcomplete['修課幾學期'] >= 8]
 #秀出97、98年入學者資料有幾筆
 df9798 = df.groupby(['學號','入學年','系別']).size().reset_index(name='人數')
 df9798 = df9798.groupby(['入學年','系別']).size().reset_index(name='人數')
+df9798 =  df9798[(df9798['入學年'] == '998') | (df9798['入學年'] == '997') ]
+df = df[(df['入學年'] != '998') & (df['入學年'] != '997') ]
+
 ```
 ```{r results="asis"}
 py$df9798%>% DT::datatable()
 ```
 
-觀察掉一些入學年9開頭的資料不完整，刪去這些年的資料。
+觀察到一些入學年9開頭的資料不完整，刪去這些年的資料。
 
 
 # 目的
@@ -99,13 +103,13 @@ ggplot(py$df4 , aes(x= 二一次數,y=人數)) + geom_bar(stat="identity") + coo
 
 ```{python}
 #計算各班人數
-dfnum = df.groupby(['系別','入學年','學號','班別']).size().reset_index()
+dfnum = df.groupby(['系別','入學年','學號']).size().reset_index()
 #print(dfnum)
-dfnum = dfnum.groupby(['系別','入學年','學號','班別']).size().reset_index(name = 'x')
+dfnum = dfnum.groupby(['系別','入學年','學號']).size().reset_index(name = 'x')
 #print(dfnum)
-dfnum = dfnum.groupby(['系別','入學年','班別']).size().reset_index(name = '該班人數')
+dfnum = dfnum.groupby(['系別','入學年']).size().reset_index(name = '該班人數')
 #print(dfnum)
-df = pd.merge(df,dfnum,on=['系別','入學年','班別'],how='left')
+df = pd.merge(df,dfnum,on=['系別','入學年'],how='left')
 #將體育課名統一化
 df['名稱'] = np.where(df['科目名稱'].str[:2] == '體育', '體育',df['科目名稱'])
 df['ClassId'] = df['名稱'] + df['學年'].astype(str) + df['學期'].astype(str)
@@ -113,15 +117,14 @@ df['ClassId'] = df['名稱'] + df['學年'].astype(str) + df['學期'].astype(st
 
 ### 計算各系必修中位數
 
-各同學成績單中所顯示的必修課為該同學自己的必修課；及表示可能會受該同學因有修教育學分、雙主修等因素影響而無法反應該系真實必修狀況，故在此建立新的必修的算法，將同入學年且同班別系級的同學定義為同班，利用同班中若有一半以的同學修該門必修課則列入必修課。
+各同學成績單中所顯示的必修課為該同學自己的必修課；及表示可能會受該同學因有修教育學分、雙主修等因素影響而無法反應該系真實必修狀況，故在此建立新的必修的算法，將同入學年且同班別系級的同學定義為同班，利用同班中若有八成以的同學修該門必修課則列入必修課。
 
 ```{python}
 #計算各科目中各班幾人修
-#僅計算必修且班級人數要有20人以上
 df5 = df[df['必選修類別（必／選／通）']=='必']
 df5_1 = df5.groupby(['ClassId','系別','入學年']).size().reset_index(name = '該班幾人修此課')
 df5 = pd.merge(df5,df5_1,on=['ClassId','系別','入學年'],how='left')
-#若該班修課人數>該班人數的5成則那門課算為必修課
+#若該班修課人數>該班人數的8成則那門課算為必修課
 df5['是否為必修'] = np.where((df5['該班幾人修此課']/df5['該班人數']) >= 0.8 , 1 , 0)
 ```
 ```{python}
@@ -129,7 +132,9 @@ df5['是否為必修'] = np.where((df5['該班幾人修此課']/df5['該班人�
 dfclass1 = df5.groupby(['系別','入學年','學號'])['是否為必修'].sum().reset_index(name = '個人必修數')
 df = pd.merge(df,dfclass1,on=['系別','入學年','學號'],how='left')
 dfclass11 = dfclass1.groupby(['系別','入學年'])['個人必修數'].median().reset_index(name = '班中位數')
-#dfclass11 = dfclass11.groupby(['系別'])['班中位數'].mean().reset_index(name = '必修中位數')
+```
+```{r results="asis"}
+py$dfclass11%>% DT::datatable()
 ```
 
 ```{python}
@@ -148,20 +153,15 @@ dfclass1_1_3 = dfclass1_1_3.drop(['當學期必修修課數','累積必修修課
 df=pd.merge(df,dfclass1_1_3,on = ['學號','學年','學期'],how='outer')
 ```
 
-```{r results="asis"}
-py$dfclass11%>% DT::datatable()
-```
+
 
 ### 計算各系選修中位數
-
-選修中位數算法為先算出各班的必修中位數在以系分別平均。
 
 ```{python}
 #計算每人選修課數、 各班中位數
 dfclass2 = df[df['必選修類別（必／選／通）'] == '選']
-dfclass2 = dfclass2.groupby(['系別','入學年','班別','學號']).size().reset_index(name = '個人選修數')
-dfclass2 = dfclass2.groupby(['系別','入學年','班別'])['個人選修數'].median().reset_index(name = '班選修中位數')
-dfclass2 = dfclass2.groupby(['系別'])['班選修中位數'].mean().reset_index(name = '選修中位數')
+dfclass2 = dfclass2.groupby(['系別','入學年','學號']).size().reset_index(name = '個人選修數')
+dfclass2 = dfclass2.groupby(['系別','入學年'])['個人選修數'].median().reset_index(name = '班選修中位數')
 ```
 
 ```{r results="asis"}
@@ -184,14 +184,12 @@ df=pd.merge(df,dfclass2_1_3,on = ['學號','學年','學期'],how='outer')
 
 ### 計算各系通識中位數
 
-通識中位數算法與選修算法相同，先算出各班的必修中位數在以系分別平均。
 
 ```{python}
 #計算每人通識課數、 各班中位數
 dfclass3 = df[df['必選修類別（必／選／通）'] == '通']
-dfclass3 = dfclass3.groupby(['系別','入學年','班別','學號']).size().reset_index(name = '個人通識數')
-dfclass3 = dfclass3.groupby(['系別','入學年','班別'])['個人通識數'].median().reset_index(name = '班通識中位數')
-dfclass3 = dfclass3.groupby(['系別'])['班通識中位數'].mean().reset_index(name = '通識中位數')
+dfclass3 = dfclass3.groupby(['系別','入學年','學號']).size().reset_index(name = '個人通識數')
+dfclass3 = dfclass3.groupby(['系別','入學年'])['個人通識數'].median().reset_index(name = '班通識中位數')
 ```
 ```{r results="asis"}
 py$dfclass3%>% DT::datatable()
@@ -211,24 +209,48 @@ dfclass3_1_3 = dfclass3_1_3.drop(['當學期通識修課數','累積通識修課
 df=pd.merge(df,dfclass3_1_3,on = ['學號','學年','學期'],how='outer')
 ```
 
-＊＊檢查
-
-```{python}
-dk =(df.groupby(['系別','入學年','班別','學號']).size().reset_index().groupby(['系別','入學年','班別']).size().reset_index(name = 'num'))
-```
-```{r}
-py$dk%>% DT::datatable()
-```
 ### 累計外系修課狀況
 
-外系的修課狀況是否也會影響到二一的預測也是我們想知道的，故加入變數之中，藉由累計外系修課數，觀察同學在於外系修課的狀況，由表X知道各系會因為規定不同，導致外系修課數有所不同，所以在此我們做標準化處理（減班平均處以班標準差）。
-
-<表 顯示各系外系修課數>
-
-
+外系的修課狀況是否也會影響到二一的預測也是我們想知道的，故加入變數之中，藉由外系修課數，觀察同學在於外系修課的狀況，由表X知道各系會因為規定不同，導致外系修課數有所不同，所以在此我們做標準化處理（減班平均處以班標準差）。
+定義外系課程為，去掉通識課與本系開設課程後，若該班中不到八成的同學修該門課則列入外系課程，班定義為同入學年且同系的同學，其中法律系的開課系所不分組統一為法律系。
+定義累計外系修課指標為標準化每學期外系修課數後累積值。
 
 
-### 必修/選修/通識成績表現（pr）（怕會跟累計被當比例用共線的問題，待討論）
+```{python}
+dfom=df[df['必選修類別（必／選／通）'] != '通']
+dfom['開課系所'] = np.where(dfom['開課系所'].astype(str).str[0] == '法',dfom['開課系所'].str[:4],dfom['開課系所'])
+dfom = dfom[dfom['開課系所'] != dfom['系別']]
+dftemp = dfom.groupby(['ClassId','系別','入學年']).size().reset_index(name = '該班幾人修此課')
+dfom = pd.merge(dfom,dftemp,on=['ClassId','系別','入學年'],how='left')
+dfom['是否為外系課'] = np.where((dfom['該班幾人修此課']/dfom['該班人數']) < 0.8 , 1 , 0)
+dftemp = dfom.groupby(['系別','入學年','學號'])['是否為外系課'].sum().reset_index(name = '個人外系修課數')
+dfom = pd.merge(dfom,dftemp,on=['系別','入學年','學號'],how='left')
+dftemp = dfom.groupby(['系別','入學年'])['個人外系修課數'].median().reset_index(name = '班中位數')
+```
+```{r results="asis"}
+py$dftemp %>% DT::datatable()
+```
+```{python}
+#貼上特徵
+#各學期班上的外系修課平均
+dfmean = dfom.groupby(['系別','入學年','學年','學期'])['個人外系修課數'].mean().reset_index(name = '班平均數')
+#各學期班上的外系修課標準差
+dfstd = dfom.groupby(['系別','入學年','學年','學期'])['個人外系修課數'].std().reset_index(name = '班標準差')
+dfom = pd.merge(dfom,dfmean,on=['系別','入學年','學年','學期'],how='outer')
+dfom = pd.merge(dfom,dfstd,on=['系別','入學年','學年','學期'],how='outer')
+dfom['外系標準化修課數'] = (dfom['個人外系修課數'] - dfom['班平均數']) / dfom['班標準差']
+dfa=dfom.groupby(['學號','學年','學期'])['外系標準化修課數'].mean().reset_index()
+dfa['累計外系修課指標'] = dfa.groupby(['學號'])['外系標準化修課數'].apply(lambda x: x.cumsum())
+dfa = dfa.drop(['外系標準化修課數'],axis =1)
+df = pd.merge(df,dfa,on=['學號','學年','學期'],how='outer')
+```
+### 必修/選修/通識成績表現（pr）
+
+與同班同學做pr比較。
+
+
+
+
 ## 同儕面向
 ### 累計群聚指標
 相信同學會被二一不僅僅是純粹學習上的問題，也有可能受到同儕之間群聚效應的影響，為了捕捉同學於班上的互動狀況如何，我們創造一新的變數學期(學年)群聚指標以衡量學生在於一學期(學年)的課程之中平均一週會見到多少同班同學；創造作法為藉由學生修課星期與第幾節課來尋找同班同學有多少人也有一起修課，最後藉由表X可觀察出各系的群聚指標會因為各系課程上的差異而有所差異，所以我們再將群聚指標做標準化（減去同班的平均再除以班上的標準差），作為解釋變數。
@@ -250,7 +272,6 @@ py$dk%>% DT::datatable()
 
 
 
-備註：到時候可能只能用完整資料來做train，因為許多學生都只有一年的資料無法做預測的動作。
 
 
 
