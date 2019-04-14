@@ -118,6 +118,7 @@ df['ClassId'] = df['名稱'] + df['學年'].astype(str) + df['學期'].astype(st
 
 
 #### 計算各系必修去掉體、必修英文與軍訓
+>在該學期沒有必修or通識or選修會使累積被當比為na
 
 各同學成績單中所顯示的必修課為該同學自己的必修課；及表示可能會受該同學因有修教育學分、雙主修等因素影響而無法反應該系真實必修狀況，故在此建立新的必修的算法，將同入學年且同班別系級的同學定義為同班，利用同班中若有五成以上的同學修該門必修課則列入必修課。
 這裡的必修課程中去掉開課系所為軍訓與語言中心者也去掉體育課。
@@ -172,15 +173,12 @@ dfclass1_1=df[df['必選修類別（必／選／通）'] == '必']
 dfclass1_1_1=dfclass1_1.groupby(['學號','學年','學期'])['不及格'].sum().reset_index(name = '必修被當')
 dfclass1_1_1['累積必修被當'] =dfclass1_1_1.groupby(['學號'])['必修被當'].apply(lambda x: x.cumsum())
 dfclass1_1_2=dfclass1_1.groupby(['學號','學年','學期']).size().reset_index(name = '當學期必修修課數')
-dfclass1_1_2['累積必修修課數'] =dfclass1_1_2.groupby(['學號'])['當學期必修修課數'].apply(lambda x: x.cumsum())
+dfclass1_1_2['累積必修修課數']=dfclass1_1_2.groupby(['學號'])['當學期必修修課數'].apply(lambda x: x.cumsum())
 dfclass1_1_3=pd.merge(dfclass1_1_2,dfclass1_1_1,on = ['學號','學年','學期'])
 dfclass1_1_3['累積必修被當比'] = dfclass1_1_3['累積必修被當'] / dfclass1_1_3['累積必修修課數']
-dfclass1_1_3 = dfclass1_1_3.drop(['當學期必修修課數','累積必修修課數','必修被當','累積必修被當'],axis =1)
-#print(dfclass1_1_3)
-df=pd.merge(df,dfclass1_1_3,on = ['學號','學年','學期'],how='outer')
+#dfclass1_1_3 = dfclass1_1_3.drop(['當學期必修修課數','累積必修修課數','必修被當','累積必修被當'],axis =1)
+#df=pd.merge(df,dfclass1_1_3,on = ['學號','學年','學期'],how='outer')
 ```
-
-
 
 #### 計算各系選修中位數
 
@@ -214,13 +212,15 @@ df=pd.merge(df,dfclass2_1_3,on = ['學號','學年','學期'],how='outer')
 
 ```{python}
 #計算每人通識課數、 各班中位數
-dfclass3 = df[df['必選修類別（必／選／通）'] == '通']
+dfclass3 = df[(df['必選修類別（必／選／通）'] == '通')]
 dfclass3 = dfclass3.groupby(['系別','入學年','學號']).size().reset_index(name = '個人通識數')
 dfclass3 = dfclass3.groupby(['系別','入學年'])['個人通識數'].median().reset_index(name = '班通識中位數')
 ```
 ```{r results="asis"}
 py$dfclass3%>% DT::datatable()
 ```
+
+
 
 ```{python}
 #貼上特徵
@@ -239,7 +239,7 @@ df=pd.merge(df,dfclass3_1_3,on = ['學號','學年','學期'],how='outer')
 ### 累計外系修課狀況
 
 外系的修課狀況是否也會影響到二一的預測也是我們想知道的，故加入變數之中，藉由外系修課數，觀察同學在於外系修課的狀況，由表X知道各系會因為規定不同，導致外系修課數有所不同，所以在此我們做標準化處理（減班平均處以班標準差）。
-定義外系課程為，去掉通識課與本系開設課程後，若該班中不到八成的同學修該門課則列入外系課程，班定義為同入學年且同系的同學，其中法律系的開課系所不分組統一為法律系。
+定義外系課程為，去掉通識課與本系開設課程後，若該班中不到五成的同學修該門課則列入外系課程，班定義為同入學年且同系的同學，其中法律系的開課系所不分組統一為法律系。
 定義累計外系修課指標為標準化每學期外系修課數後累積值。
 
 
@@ -247,9 +247,9 @@ df=pd.merge(df,dfclass3_1_3,on = ['學號','學年','學期'],how='outer')
 dfom=df[df['必選修類別（必／選／通）'] != '通']
 dfom['開課系所'] = np.where(dfom['開課系所'].astype(str).str[0] == '法',dfom['開課系所'].str[:4],dfom['開課系所'])
 dfom = dfom[dfom['開課系所'] != dfom['系別']]
-dftemp = dfom.groupby(['ClassId','系別','入學年']).size().reset_index(name = '該班幾人修此課')
-dfom = pd.merge(dfom,dftemp,on=['ClassId','系別','入學年'],how='left')
-dfom['是否為外系課'] = np.where((dfom['該班幾人修此課']/dfom['該班人數']) < 0.8 , 1 , 0)
+dftemp = dfom.groupby(['科目名稱','系別','入學年']).size().reset_index(name = '該課被該班修過幾次')
+dfom = pd.merge(dfom,dftemp,on=['科目名稱','系別','入學年'],how='left')
+dfom['是否為外系課'] = np.where((dfom['該課被該班修過幾次']/dfom['該班人數']) < 0.5 , 1 , 0)
 dftemp = dfom.groupby(['系別','入學年','學號'])['是否為外系課'].sum().reset_index(name = '個人外系修課數')
 dfom = pd.merge(dfom,dftemp,on=['系別','入學年','學號'],how='left')
 dftemp = dfom.groupby(['系別','入學年'])['個人外系修課數'].median().reset_index(name = '班中位數')
@@ -273,17 +273,21 @@ df = pd.merge(df,dfa,on=['學號','學年','學期'],how='outer')
 ```
 ### 必修/選修/通識成績表現
 
+>到時候必須處理na的狀況(na原因為該同學若再當學期沒有本系課程or外系課程)
+>延畢生在其他同學都畢業後的學期裡面pr值會直接變100(沒有同儕可以比pr)
+
 衡量成績表現時針對本系課程與外系課程成績表現有不同的衡量方式，本系的定義與上小節相同。
 
 - 本系課程衡量方式：算出各學期平均成績在同班同學做pr比較得到個學期的pr值。
 
-- 外系課程衡量方式：該門外系課成績與該門外系課的修課同學做pr比較，得到各外系課pr後在以同學期做平均得到不同學期的外系課pr。
+- 外系課程衡量方式：就各門外系課成績與各門外系課的修課同學做那門課的成績pr排名，得到各外系課pr排名後在以同學期做平均得到不同學期的外系課pr。
 
 ```{python}
+df['ClassId'] = df['科目名稱'] + df['學年'].astype(str) + df['學期'].astype(str)
 #貼上特徵
 df21 = df.groupby(['ClassId','系別','入學年']).size().reset_index(name = '該班幾人修此課')
 df = pd.merge(df,df21,on=['ClassId','系別','入學年'],how='left')
-#若該班修課人數>該班人數的8成則那門課算為必修課
+#若該班修課人數>=該班人數的8成則那門課算為必修課
 df['是否為本系課程'] = np.where((df['該班幾人修此課']/df['該班人數']) >= 0.8 , 1 , 0)
 ```
 ```{python}
@@ -292,6 +296,13 @@ df22_1 = df22.groupby(['學號','學年','學期'])['學期成績'].mean().reset
 df = pd.merge(df,df22_1,on=['學號','學年','學期'],how='outer')
 df =df.assign(pr=df.groupby(['系別','入學年','學年','學期'])['學期平均分數'].rank(pct=True).mul(100))
 ```
+```{python}
+df25 = df[df['是否為本系課程'] == 0]
+df25 =df25.assign(pr2=df25.groupby(['ClassId'])['學期成績'].rank(pct=True).mul(100))
+df25_1=df25.groupby(['學號','學年','學期'])['pr2'].mean().reset_index(name = '外系pr')
+df = pd.merge(df,df25_1,on=['學號','學年','學期'],how='outer')
+```
+
 
 
 
