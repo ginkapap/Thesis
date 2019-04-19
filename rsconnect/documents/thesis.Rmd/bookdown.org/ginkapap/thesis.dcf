@@ -1,0 +1,12 @@
+name: thesis
+title: thesis
+username: ginkapap
+account: ginkapap
+server: bookdown.org
+hostUrl: https://bookdown.org/__api__
+appId: 2439
+bundleId: 9737
+url: https://bookdown.org/ginkapap/thesis/
+when: 1555654203.54703
+asMultiple: FALSE
+asStatic: TRUE
