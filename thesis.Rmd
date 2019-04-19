@@ -38,7 +38,7 @@ use_condaenv("ginkapap")
 #py_available()
 ```
 
-```{python}
+```{python 處理成完整學年資料}
 import pandas as pd
 import numpy as np
 df = pd.read_csv('~/Dropbox/M-Team/research-transcript-and-student-types/main_student2.csv')
@@ -165,19 +165,28 @@ b1.columns = ['100','101','102','103']
 ```{r results="asis"}
 py$b1%>% DT::datatable()
 ```
-```{python}
+```{python 貼上累計必修被當比特徵}
 #貼上特徵
 #必修不及格各學期狀況
 df['不及格']=np.where(df['學期成績'] < 60 , 1 , 0)
 dfclass1_1=df[df['必選修類別（必／選／通）'] == '必']
+
 dfclass1_1_1=dfclass1_1.groupby(['學號','學年','學期'])['不及格'].sum().reset_index(name = '必修被當')
+df = pd.merge(df,dfclass1_1_1,on=['學號','學年','學期'],how='outer')
+df=df.fillna(0)
+dfclass1_1_1 = df.groupby(['學號','學年','學期'])['必修被當'].mean().reset_index()
 dfclass1_1_1['累積必修被當'] =dfclass1_1_1.groupby(['學號'])['必修被當'].apply(lambda x: x.cumsum())
+
 dfclass1_1_2=dfclass1_1.groupby(['學號','學年','學期']).size().reset_index(name = '當學期必修修課數')
-dfclass1_1_2['累積必修修課數']=dfclass1_1_2.groupby(['學號'])['當學期必修修課數'].apply(lambda x: x.cumsum())
+df = pd.merge(df,dfclass1_1_2,on=['學號','學年','學期'],how='outer')
+df=df.fillna(0)
+dfclass1_1_2 = df.groupby(['學號','學年','學期'])['當學期必修修課數'].mean().reset_index()
+dfclass1_1_2['累積必修修課數'] =dfclass1_1_2.groupby(['學號'])['當學期必修修課數'].apply(lambda x: x.cumsum())
+
 dfclass1_1_3=pd.merge(dfclass1_1_2,dfclass1_1_1,on = ['學號','學年','學期'])
 dfclass1_1_3['累積必修被當比'] = dfclass1_1_3['累積必修被當'] / dfclass1_1_3['累積必修修課數']
-#dfclass1_1_3 = dfclass1_1_3.drop(['當學期必修修課數','累積必修修課數','必修被當','累積必修被當'],axis =1)
-#df=pd.merge(df,dfclass1_1_3,on = ['學號','學年','學期'],how='outer')
+dfclass1_1_3 = dfclass1_1_3.drop(['當學期必修修課數','累積必修修課數','必修被當','累積必修被當'],axis =1)
+df=pd.merge(df,dfclass1_1_3,on = ['學號','學年','學期'],how='outer')
 ```
 
 #### 計算各系選修中位數
@@ -195,7 +204,7 @@ dfclass2 = dfclass2.groupby(['系別','入學年'])['個人選修數'].median().
 py$dfclass2%>% DT::datatable()
 ```
 
-```{python}
+```{pytho 貼上累計選修被當比特徵}
 #貼上特徵
 #選修不及格各學期狀況
 dfclass2_1=df[df['必選修類別（必／選／通）'] == '選']
@@ -224,7 +233,7 @@ py$dfclass3%>% DT::datatable()
 
 
 
-```{python}
+```{python }
 #貼上特徵
 #通識不及格各學期狀況
 dfclass3_1=df[df['必選修類別（必／選／通）'] == '通']
