@@ -129,7 +129,9 @@ df['ClassId'] = df['名稱'] + df['學年'].astype(str) + df['學期'].astype(st
 df5 = df[df['必選修類別（必／選／通）']=='必']
 df5 = df5[df5['開課系所'] != '軍訓（必選修）']
 df5 = df5[df5['名稱'] != '體育']
-df5 = df5[df5['開課系所'] != '語言中心']
+df5 = df5[(df5['科目名稱'] !='大一國文：經典閱讀與詮釋') &(df5['科目名稱'] !='國文：經典閱讀與詮釋') & (df5['科目名稱'] !='大學英文：英語聽講練習')  & (df5['科目名稱'] !='大學英文') & (df5['科目名稱'] !='英語聽講練習') & (df5['科目名稱'] !='英文') & (df5['科目名稱'] !='歷史')]
+
+
 df5_1 = df5.groupby(['科目名稱','系別','入學年']).size().reset_index(name = '該課被該班修過幾次')
 df5 = pd.merge(df5,df5_1,on=['科目名稱','系別','入學年'],how='left')
 #若該班修課人數>該班人數的8成則那門課算為必修課
@@ -162,6 +164,14 @@ b1.drop(b1.index[0], inplace=True)
 b1.fillna(0,inplace=True)
 b1.columns = ['100','101','102','103']
 ```
+```{python}
+#test 經濟系
+dfd = (df5[(df5['系別'] == '經濟學系') & (df5['是否為必修'] == 1)])
+dfd = dfd.groupby(['科目名稱','入學年']).size().reset_index()
+dff = dfd.groupby(['科目名稱']).size().reset_index()
+#結果完美
+```
+
 ```{r results="asis"}
 py$b1%>% DT::datatable()
 ```
