@@ -87,7 +87,7 @@ dftestt = pd.DataFrame(df.groupby(['學號',"學期",'學年']).size().reset_ind
 dftestt = pd.DataFrame(dftestt.groupby(['學號']).size().reset_index(name='修課幾學期'))
 dfcomplete1 = pd.merge(df,dftestt,on='學號') 
 dfpic = dfcomplete1[dfcomplete1['修課幾學期'] >= 8]
-
+####
 df2 = dfpic.groupby(['學號','學年','學期'])['實拿學分','學分數'].sum().reset_index()
 df2['是否被二一'] = np.where(df2['實拿學分']/df2['學分數'] <= 1/2 ,1 ,0)
 df3 = df2[df2['是否被二一'] == 1]
@@ -96,11 +96,10 @@ df4 = df3.groupby('二一次數').size().reset_index(name = '人數')
 ```
 ```{r results="asis"}
 py$df4 %>% DT::datatable()
-
 ggplot(py$df4 , aes(x= 二一次數,y=人數)) + geom_bar(stat="identity") + coord_flip()
 ```
 
-從100學年度起至103學年度入學學生中，共有4941位學生資料，其中學生被二一的紀錄有295筆，由上表可知在被二一的同學之中被二一壹次的紀錄最多筆，共有297筆，被二一兩次的有46筆；三次以上則有13筆。
+從100學年度起至103學年度入學學生中，共有4941位學生資料，其中學生被二一的紀錄有364筆，由上表可知在被二一的同學之中被二一壹次的紀錄最多筆，共有295筆，被二一兩次的有46筆；三次以上則有23筆。
 
 ## 修課面向
 
