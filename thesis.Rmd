@@ -27,6 +27,7 @@ library(purrr)
 library(lubridate)
 library(tidyr)
 library(showtext)
+library(ggridges)
 #font_add("QYuan","cwTeXQYuan-Medium.ttf")
 showtext_auto(enable=TRUE)
 theme_set(theme_classic())
@@ -39,7 +40,10 @@ use_condaenv("ginkapap")
 #py_available()
 ```
 
-```{python 處理成完整學年資料}
+
+
+
+```{python 匯入資料}
 import pandas as pd
 import numpy as np
 df = pd.read_csv('~/Dropbox/M-Team/research-transcript-and-student-types/main_student2.csv')
@@ -57,7 +61,15 @@ df['入學年'] = df['學號'].astype(str).str[1:4]
 #dfcomplete = pd.merge(df,dftest,on='學號') 
 #df = dfcomplete[dfcomplete['修課幾學期'] >= 8]
 df=df[df['系別'].str[0] != '(']
+```
+```{python 21貼}
+df21 = df.groupby(['學號','學年','學期'])['實拿學分','學分數'].sum().reset_index()
+df21['是否被二一'] = np.where(df21['實拿學分']/df21['學分數'] <= 1/2 ,1 ,0)
+df21=df21.drop(['實拿學分','學分數'],axis=1)
+df=pd.merge(df,df21,on = ['學號','學年','學期'],how='outer')
+```
 #秀出97、98年入學者資料有幾筆
+```{python}
 df9798 = df.groupby(['學號','入學年','系別']).size().reset_index(name='人數')
 df9798 = df9798.groupby(['入學年','系別']).size().reset_index(name='人數')
 df9798 =  df9798[(df9798['入學年'] == '998') | (df9798['入學年'] == '997') | (df9798['入學年'] == '967') | (df9798['入學年'] == '968') | (df9798['入學年'] == '977') | (df9798['入學年'] == '978') | (df9798['入學年'] == '987') | (df9798['入學年'] == '988')]
@@ -73,7 +85,7 @@ py$df9798%>% DT::datatable()
 
 # 目的
 
-以往由老師發送期中預警給學生時通常學期已過一半，難以在學生遇到學習困難的初期給予協助，希望藉由二一預測系統能提早觀察出哪些學生是需要被特別關心的，藉由前幾學期的修課面向、同儕之間的關係面向、借書面向、欲預測學期的課程面向與老師面向；預測下一學期是否會被二一。
+以往由老師發送期中預警給學生時通常學期已過一半，難以在學生遇到學習困難的初期給予協助，希望藉由二一預測系統能提早觀察出哪些學生是需要被特別關心的，藉由前幾學期的修課面向、同儕之間的關係面向、欲預測學期的課程面向；預測下一學期是否會被二一。
 
 # 資料處理
 
@@ -85,27 +97,69 @@ py$df9798%>% DT::datatable()
 #去掉修課不滿八學期者
 dftestt = pd.DataFrame(df.groupby(['學號',"學期",'學年']).size().reset_index())
 dftestt = pd.DataFrame(dftestt.groupby(['學號']).size().reset_index(name='修課幾學期'))
-dfcomplete1 = pd.merge(df,dftestt,on='學號') 
-dfpic = dfcomplete1[dfcomplete1['修課幾學期'] >= 8]
+df = pd.merge(df,dftestt,on='學號') 
+dfpic = df[df['修課幾學期'] >= 8]
 ####
-df2 = dfpic.groupby(['學號','學年','學期'])['實拿學分','學分數'].sum().reset_index()
-df2['是否被二一'] = np.where(df2['實拿學分']/df2['學分數'] <= 1/2 ,1 ,0)
-df3 = df2[df2['是否被二一'] == 1]
-df3 = df3.groupby(['學號']).size().reset_index(name = '二一次數')
+dfpic_1 = dfpic[dfpic['是否被二一']==1]
+df2 = dfpic_1.groupby(['學號','學年','學期','系別','是否被二一','入學年']).size().reset_index()
+df3 = df2.groupby(['學號']).size().reset_index(name = '二一次數')
 df4 = df3.groupby('二一次數').size().reset_index(name = '人數')
-```
-```{r results="asis"}
-py$df4 %>% DT::datatable()
-ggplot(py$df4 , aes(x= 二一次數,y=人數)) + geom_bar(stat="identity") + coord_flip()
+####
+#dfpic4_1=dfpic.groupby(['學號','學年','學期'])['是否被二一'].mean().reset_index()
+#dfpic4_1['是否被二一'] = dfpic4_1['是否被二一'].astype(str)
 ```
 
-從100學年度起至103學年度入學學生中，共有4941位學生資料，其中學生被二一的紀錄有364筆，由上表可知在被二一的同學之中被二一壹次的紀錄最多筆，共有295筆，被二一兩次的有46筆；三次以上則有23筆。
+```{r 1, results="asis" }
+#py$df4_1 %>% DT::datatable()
+
+ggplot(py$df4, aes(x=二一次數, y=人數)) +
+  geom_segment( aes(x=二一次數, xend=二一次數, y=0, yend=人數), color="grey") +
+  geom_point(color="orange", size=2) +coord_flip() 
+
+#ggplot(py$df4 , aes(x= 二一次數,y=人數)) + geom_bar(stat="identity") + coord_flip()
+```
+
+從100學年度起至103學入學年，擁有完整八學期的學生中，共有4941位學生資料，其中學生被二一的紀錄有364筆，由上圖可知在被二一的同學之中被二一壹次的紀錄最多筆，共有295筆，被二一兩次的有46筆；三次以上則有23筆。
+
+```{python }
+dfpic2 = dfpic.groupby(['學號','入學年','是否被二一']).size().reset_index(name='t')
+dfpic2['是否被二一']=dfpic2['是否被二一'].astype(int)
+dfpic2_1 = dfpic2.groupby(['學號','入學年'])['是否被二一'].sum().reset_index(name='二一')
+dfpic2_1['二一']=dfpic2_1['二一'].astype(str)
+dfpic2_1['入學年']=dfpic2_1['入學年'].astype(str)
+```
+```{r}
+ggplot(py$dfpic2_1, aes(x = 入學年, fill = 二一)) +  
+  geom_bar(position = "fill") +
+  labs(x='入學年',y = "比例",size=10) +
+  scale_fill_discrete(name="二一",labels=c("有","無"))+ scale_y_continuous(breaks=seq(0,1,0.1))
+```
+
+上圖可以知道兩點：
+  - 入學年對於同學被二一的狀況是沒有太大的差異的，被二一的比例皆差不多。
+  - 資料中被二一的人數很少， 所以模型的預測結果應該以召回率來看（預測=1/現實=1；較可以接受type 1 error）。
+
+
+```{python 圖}
+dfpic['年級'] = dfpic['系級'].str[-1]
+dfpic3 = dfpic.groupby(['學號','年級','系別','是否被二一']).size().reset_index(name='t')
+dfpic3['是否被二一']=dfpic3['是否被二一'].astype(int)
+dfpic3_1 = dfpic3.groupby(['學號','年級','系別'])['是否被二一'].sum().reset_index(name='二一')
+dfpic3_1 = dfpic3_1[dfpic3_1['二一']==1]
+
+```
+```{r}
+ggplot(py$dfpic3_1, aes(x = 系別, fill = 年級)) +  
+  geom_bar(position = "dodge") +coord_flip()+labs(x='數目',y = "系別",size=10) +scale_fill_discrete(name="年級")
+```
+
+上圖顯示被二一的同學們中各系主要都集中在一年級或是四年級，推估一年級可能對於大學生活不適應導致比較會被二一而大四可能修課較少，故二一的可能性就會提高。
 
 ## 修課面向
 
 ### 累計被當比例
 
-同學會被二一最直接連想的為此為同學歷年來的修課狀況與紀錄，在此新增變數分別為；累計必修被當比例、累計選修被當比例以及累計通識被當比例作為捕捉修課面向的特徵，選擇比例而非堂數的原因可分別由<表X>看出；各系對於必選修與通識上的要求並不一樣故使用比例。
+同學會被二一最直接連想的為此為同學歷年來的修課狀況與紀錄，在此新增變數分別為；累計必修被當比例、累計選修被當比例以及累計通識被當比例作為捕捉修課面向的特徵，選擇比例而非堂數的原因可分別由表看出；各系對於必選修與通識上的要求並不一樣故使用比例。
 
 
 ```{python 體育課名統一}
@@ -164,9 +218,6 @@ b1.fillna(0,inplace=True)
 b1.columns = ['100','101','102','103','104','105','106']
 b1=b1.drop(['104','105','106'],axis=1)
 ```
-```{r results="asis"}
-py$b1%>% DT::datatable()
-```
 
 ```{python 貼上累計必修被當比特徵}
 #貼上特徵
@@ -178,23 +229,45 @@ dfclass1_1_1=dfclass1_1.groupby(['學號','學年','學期'])['不及格'].sum()
 df = pd.merge(df,dfclass1_1_1,on=['學號','學年','學期'],how='outer')
 df=df.fillna(0)
 dfclass1_1_1 = df.groupby(['學號','學年','學期'])['必修被當'].mean().reset_index()
-dfclass1_1_1['累積必修被當'] =dfclass1_1_1.groupby(['學號'])['必修被當'].apply(lambda x: x.cumsum())
+dfclass1_1_1['累積必修被當'] =dfclass1_1_1.groupby(['學號'])['必修被當'].apply(lambda x: x.cumsum().shift())
+dfclass1_1_1 = dfclass1_1_1.fillna(0)
 
 dfclass1_1_2=dfclass1_1.groupby(['學號','學年','學期']).size().reset_index(name = '當學期必修修課數')
 df = pd.merge(df,dfclass1_1_2,on=['學號','學年','學期'],how='outer')
 df=df.fillna(0)
 dfclass1_1_2 = df.groupby(['學號','學年','學期'])['當學期必修修課數'].mean().reset_index()
-dfclass1_1_2['累積必修修課數'] =dfclass1_1_2.groupby(['學號'])['當學期必修修課數'].apply(lambda x: x.cumsum())
+dfclass1_1_2['累積必修修課數'] =dfclass1_1_2.groupby(['學號'])['當學期必修修課數'].apply(lambda x: x.cumsum().shift())
+dfclass1_1_2 = dfclass1_1_2.fillna(0)
 
 dfclass1_1_3=pd.merge(dfclass1_1_2,dfclass1_1_1,on = ['學號','學年','學期'])
 dfclass1_1_3['累積必修被當比'] = dfclass1_1_3['累積必修被當'] / dfclass1_1_3['累積必修修課數']
-dfclass1_1_3 = dfclass1_1_3.drop(['當學期必修修課數','累積必修修課數','必修被當','累積必修被當'],axis =1)
+dfclass1_1_3 = dfclass1_1_3.drop(['當學期必修修課數','必修被當'],axis =1)
+dfclass1_1_3 = dfclass1_1_3.fillna(0)
 df=pd.merge(df,dfclass1_1_3,on = ['學號','學年','學期'],how='outer')
 ```
 
+```{python}
+dfpic4 = df[df['修課幾學期'] >= 8]
+dfpic4['年級'] = dfpic4['系級'].str[-1] + dfpic4['學期'].astype(str)
+#print(dfclass1_1_1[dfclass1_1_1['學號']==410071464])
+dfpic4 = dfpic4.groupby(['學號','學年','學期','年級','是否被二一'])['累積必修被當'].mean().reset_index(name='累積必修被當')
+dfpic4['是否被二一'] = dfpic4['是否被二一'].astype(str)
+```
+
+```{r results='asis'}
+ggplot(py$dfpic4, aes(x=年級, y=累積必修被當, fill=是否被二一)) + 
+    geom_boxplot()+labs(x='年級',y = "累積必修被當",size=10) +scale_fill_discrete(name="是否被二一")
+```
+```{r results="asis"}
+py$b1%>% DT::datatable()
+```
+
+一年級第一學期正常來說是不會有累積必修被當的，這裏會出現少許高於0的素質原因為該同學們重讀一年級第一學期兩次以上。
+圖中被二一的人累積到前一期的必修被當科目是明顯高於沒被二一的人。
+表也顯示了各系必修數不同的狀況。
+
 #### 計算各系選修中位數
 
-各系的畢業學分與專業必修課數皆不相同，由下表可看出各系選修中位數有明顯的不同。
 
 ```{python 計算選修中位數}
 #計算每人選修課數、 各班中位數
@@ -203,10 +276,6 @@ dfclass2 = dfclass2.groupby(['系別','入學年','學號']).size().reset_index(
 dfclass2 = dfclass2.groupby(['系別','入學年'])['個人選修數'].median().reset_index(name = '班選修中位數')
 dfclass2=dfclass2[(dfclass2['入學年']=='100') |(dfclass2['入學年']=='101') | (dfclass2['入學年']=='102') |
 (dfclass2['入學年']=='103')]
-```
-
-```{r results="asis"}
-py$dfclass2%>% DT::datatable()
 ```
 
 ```{python 貼上累計選修被當比特徵}
@@ -219,7 +288,8 @@ dfclass2_1_1=dfclass2_1.groupby(['學號','學年','學期'])['不及格'].sum()
 df = pd.merge(df,dfclass2_1_1,on=['學號','學年','學期'],how='outer')
 df=df.fillna(0)
 dfclass2_1_1 = df.groupby(['學號','學年','學期'])['選修被當'].mean().reset_index()
-dfclass2_1_1['累積選修被當'] =dfclass2_1_1.groupby(['學號'])['選修被當'].apply(lambda x: x.cumsum())
+dfclass2_1_1['累積選修被當'] =dfclass2_1_1.groupby(['學號'])['選修被當'].apply(lambda x: x.cumsum().shift())
+dfclass2_1_1 = dfclass2_1_1.fillna(0)
 
 
 dfclass2_1_2=dfclass2_1.groupby(['學號','學年','學期']).size().reset_index(name = '當學期選修修課數')
@@ -227,62 +297,96 @@ df = pd.merge(df,dfclass2_1_2,on=['學號','學年','學期'],how='outer')
 df=df.fillna(0)
 dfclass2_1_2 = df.groupby(['學號','學年','學期'])['當學期選修修課數'].mean().reset_index()
 
-dfclass2_1_2['累積選修修課數'] =dfclass2_1_2.groupby(['學號'])['當學期選修修課數'].apply(lambda x: x.cumsum())
+dfclass2_1_2['累積選修修課數'] =dfclass2_1_2.groupby(['學號'])['當學期選修修課數'].apply(lambda x: x.cumsum().shift())
+dfclass2_1_2 = dfclass2_1_2.fillna(0)
 dfclass2_1_3=pd.merge(dfclass2_1_2,dfclass2_1_1,on = ['學號','學年','學期'])
 dfclass2_1_3['累積選修被當比'] = dfclass2_1_3['累積選修被當'] / dfclass2_1_3['累積選修修課數']
-dfclass2_1_3 = dfclass2_1_3.drop(['當學期選修修課數','累積選修修課數','選修被當','累積選修被當'],axis =1)
+dfclass2_1_3 = dfclass2_1_3.drop(['當學期選修修課數','選修被當'],axis =1)
 dfclass2_1_3=dfclass2_1_3.fillna(0)
 df=pd.merge(df,dfclass2_1_3,on = ['學號','學年','學期'],how='outer')
 ```
 
+```{python}
+dfpic5 = df[df['修課幾學期'] >= 8]
+dfpic5['年級'] = dfpic5['系級'].str[-1] + dfpic5['學期'].astype(str)
+dfpic5 = dfpic5.groupby(['學號','學年','學期','年級','是否被二一'])['累積選修被當'].mean().reset_index(name='累積選修被當')
+dfpic5['是否被二一'] = dfpic5['是否被二一'].astype(str)
+```
+
+```{r results='asis'}
+ggplot(py$dfpic5, aes(x=年級, y=累積選修被當, fill=是否被二一)) + geom_boxplot()+labs(x='年級',y = "累積選修被當",size=10) +scale_fill_discrete(name="是否被二一")
+```
+
+```{r results="asis"}
+py$dfclass2%>% DT::datatable()
+```
+
+圖顯示跟必修狀況一樣，被二一的人明顯累積到當學期前被當的選修科目都比沒被二一來的多，且沒被二一的學生在於選修課程上被當的並不多，僅在大四才開始有少許的提高。
+
+各系的畢業學分與專業必修課數皆不相同，由表可看出各系選修中位數有明顯的不同，故始用比例。
 
 #### 計算各系通識中位數
 
-
 ```{python 計算通識中位數 ＊＊有些達到8、9＊＊}
 #計算每人通識課數、 各班中位數
-dfclass3 = df[(df['必選修類別（必／選／通）'] == '通')]
+dfclass3 = df[(df['必選修類別（必／選／通）'] == '通') &(df['不及格'] != 1)]
 dfclass3 = dfclass3.groupby(['系別','入學年','學號']).size().reset_index(name = '個人通識數')
 dfclass3 = dfclass3.groupby(['系別','入學年'])['個人通識數'].median().reset_index(name = '班通識中位數')
 dfclass3=dfclass3[(dfclass3['入學年']=='100') |(dfclass3['入學年']=='101') | (dfclass3['入學年']=='102') |
 (dfclass3['入學年']=='103')]
 ```
 
-```{r results="asis"}
-py$dfclass3%>% DT::datatable()
-```
-
-
 ```{python 貼上累計通識被當比特徵}
 #貼上特徵
-#通識不及格各學期狀況
 dfclass3_1=df[df['必選修類別（必／選／通）'] == '通']
 dfclass3_1_1=dfclass3_1.groupby(['學號','學年','學期'])['不及格'].sum().reset_index(name = '通識被當')
 
 df = pd.merge(df,dfclass3_1_1,on=['學號','學年','學期'],how='outer')
 df=df.fillna(0)
 dfclass3_1_1 = df.groupby(['學號','學年','學期'])['通識被當'].mean().reset_index()
-dfclass3_1_1['累積通識被當'] =dfclass3_1_1.groupby(['學號'])['通識被當'].apply(lambda x: x.cumsum())
+dfclass3_1_1['累積通識被當'] =dfclass3_1_1.groupby(['學號'])['通識被當'].apply(lambda x: x.cumsum().shift())
+dfclass3_1_1 = dfclass3_1_1.fillna(0)
 
 dfclass3_1_2=dfclass3_1.groupby(['學號','學年','學期']).size().reset_index(name = '當學期通識修課數')
 df = pd.merge(df,dfclass3_1_2,on=['學號','學年','學期'],how='outer')
 df=df.fillna(0)
 dfclass3_1_2 = df.groupby(['學號','學年','學期'])['當學期通識修課數'].mean().reset_index()
 
-dfclass3_1_2['累積通識修課數'] =dfclass3_1_2.groupby(['學號'])['當學期通識修課數'].apply(lambda x: x.cumsum())
+dfclass3_1_2['累積通識修課數'] =dfclass3_1_2.groupby(['學號'])['當學期通識修課數'].apply(lambda x: x.cumsum().shift())
+dfclass3_1_2 = dfclass3_1_2.fillna(0)
+
 dfclass3_1_3=pd.merge(dfclass3_1_2,dfclass3_1_1,on = ['學號','學年','學期'])
 dfclass3_1_3['累積通識被當比'] = dfclass3_1_3['累積通識被當'] / dfclass3_1_3['累積通識修課數']
-dfclass3_1_3 = dfclass3_1_3.drop(['當學期通識修課數','累積通識修課數','通識被當','累積通識被當'],axis =1)
+dfclass3_1_3 = dfclass3_1_3.drop(['當學期通識修課數','通識被當'],axis =1)
 dfclass3_1_3=dfclass3_1_3.fillna(0)
 df=pd.merge(df,dfclass3_1_3,on = ['學號','學年','學期'],how='outer')
 ```
 
+```{python}
+dfpic6 = df[df['修課幾學期'] >= 8]
+dfpic6['年級'] = dfpic6['系級'].str[-1]+dfpic6['學期'].astype(str)
+dfpic6 = dfpic6.groupby(['學號','學年','學期','年級','是否被二一'])['累積通識被當'].mean().reset_index(name='累積通識被當')
+dfpic6['是否被二一'] = dfpic6['是否被二一'].astype(str)
+```
+
+```{r results='asis'}
+ggplot(py$dfpic6, aes(x=年級, y=累積通識被當, fill=是否被二一)) + 
+    geom_boxplot()+labs(x='年級',y = "累積通識被當",size=10) +scale_fill_discrete(name="是否被二一")
+```
+
+```{r results="asis"}
+py$dfclass3%>% DT::datatable()
+```
+
+一二年級時大家都比較不會修通識課，所以二一與否的兩類並沒有太大的差別，
+特別注意的是在大四下的時候被二一的同學累積通識被當比會突然變很低，而大四上的累積比卻很高，這可能代表在大四上時同學們意識到自己即將畢業所以會盡量讓自己在大四上所有的通識課都能夠不被當，另外值得注意的一點為，沒被二一的同學們中大部分在通識課的表現幾乎都不會被當。
+
+表發現有些班級通識課的中位數較高，可能跟該班的特質有關，為了不讓該特質影響結果，在此同用使用比例。
+
 ### 累計外系修課狀況
 
-
-外系的修課狀況是否也會影響到二一的預測也是我們想知道的，故加入變數之中，藉由外系修課數，觀察同學在於外系修課的狀況，由表X知道各系會因為畢業學分規定不同與本系所開設的選修課程多寡，導致外系修課數有所不同，所以在此我們將做標準化處理（減班平均處以班標準差）。
+外系的修課狀況是否也會影響到二一的預測也是我們想知道的，故加入變數之中，藉由外系修課數，觀察同學在於外系修課的狀況。
 定義外系課程為，去掉通識課與本系開設課程後，若該班中不到五成的同學修該門課則列入外系課程，班定義為同入學年且同系的同學，其中法律系的開課系所不分組統一為法律系。
-因為要做標準差比較時會有延畢生在延畢學期無法跟同入學年的同學做標準化，故在建構特徵時，將以同系且同時期修課的同學定義做班標準化。。
 
 ```{python 計算外系課程中位數}
 dfom=df[df['必選修類別（必／選／通）'] != '通']
@@ -293,7 +397,6 @@ dfom = dfom[(dfom['科目名稱'] !='大一國文：經典閱讀與詮釋') &(df
 dfom['開課系所'] = np.where(dfom['開課系所'].astype(str).str[0] == '法',dfom['開課系所'].str[:4],dfom['開課系所'])
 #非本科系開設
 dfom = dfom[dfom['開課系所'] != dfom['系別']]
-#=============排除有可能被算入外系的本系課===============
 ````
 ```{python 製造累計外系修課狀況特徵1}
 #該課被該班（系別入學年=該班）修過幾次，用總資料算修課人物
@@ -307,11 +410,10 @@ dftemp = dfom.groupby(['系別','入學年','學號'])['是否為外系課'].sum
 df = pd.merge(df,dftemp,on=['系別','入學年','學號'],how='outer')
 df['個人外系修課數']=df['個人外系修課數'].fillna(0)
 #圖
-dftemp=dftemp.groupby(['系別','入學年'])['個人外系修課數'].median().reset_index(name = '個人外系修課數')
-```
-
-```{r results="asis"}
-py$dftemp %>% DT::datatable()
+dfom1 = dfom[dfom['不及格'] != 1]
+dftemp1 = dfom1.groupby(['系別','入學年','學號'])['是否為外系課'].sum().reset_index(name = '個人外系修課數')
+dftemp1=dftemp1.groupby(['系別','入學年'])['個人外系修課數'].median().reset_index(name = '外系修課數')
+dftemp1 = dftemp1[(dftemp1['入學年'] == '100') |(dftemp1['入學年'] == '101')|(dftemp1['入學年'] == '102')|(dftemp1['入學年'] == '103')]
 ```
 
 ```{python 製造累計外系修課狀況特徵2}
@@ -323,15 +425,42 @@ dfmean = dfmean.groupby(['系級','學年','學期'])['個人外系修課數'].m
 dfstd = df.groupby(['系級','學年','學期','學號'])['個人外系修課數'].mean().reset_index()
 dfstd = dfstd.groupby(['系級','學年','學期'])['個人外系修課數'].std().reset_index(name = '班標準差')
 
-dfer = pd.merge(df,dfmean,on=['系級','學年','學期'],how='outer')
-dfer = pd.merge(dfer,dfstd,on=['系級','學年','學期'],how='outer')
+df = pd.merge(df,dfmean,on=['系級','學年','學期'],how='outer')
+df = pd.merge(df,dfstd,on=['系級','學年','學期'],how='outer')
 #na值為標準差(為107年的資料可以略過)
-dfer['外系標準化修課數'] = (dfer['個人外系修課數'] - dfer['班平均']) / dfer['班標準差']
-dfa=dfer.groupby(['學號','學年','學期'])['外系標準化修課數'].mean().reset_index()
-dfa['累計外系修課指標'] = dfa.groupby(['學號'])['外系標準化修課數'].apply(lambda x: x.cumsum())
+df['外系標準化修課數'] = (df['個人外系修課數'] - df['班平均']) / df['班標準差']
+dfa=df.groupby(['學號','學年','學期'])['外系標準化修課數'].mean().reset_index()
+dfa['累計外系修課指標'] = dfa.groupby(['學號'])['外系標準化修課數'].apply(lambda x: x.cumsum().shift())
+dfa = dfa.fillna(0)
 dfa = dfa.drop(['外系標準化修課數'],axis =1)
-dfas = pd.merge(dfer,dfa,on=['學號','學年','學期'],how='outer')
+df = pd.merge(df,dfa,on=['學號','學年','學期'],how='outer')
 ```
+
+```{python}
+dfpic7 = df[df['修課幾學期'] >= 8]
+dfpic7['年級'] = dfpic7['系級'].str[-1]+dfpic7['學期'].astype(str)
+dfpic7 = dfpic7.groupby(['學號','學年','學期','年級','是否被二一'])['累計外系修課指標'].mean().reset_index(name='累計外系修課指標')
+dfpic7['是否被二一'] = dfpic7['是否被二一'].astype(str)
+```
+
+```{r results='asis'}
+ggplot(py$dfpic7, aes(x=年級, y=累計外系修課指標, fill=是否被二一)) + 
+    geom_boxplot() + ylim(-1,1)+labs(x='年級',y = "累計外系修課指標",size=10) +scale_fill_discrete(name="是否被二一")
+```
+```{r results="asis"}
+py$dftemp1 %>% DT::datatable()
+```
+
+二上、四下： 二一高，代表一下、四上瞬間快速累積外系修課
+
+>>四下高的原因可是是因為四上去修很多外系開的必/選修課？想要快點畢業
+
+二下、三上：沒二一高，代表二上二下瞬間快速累積外系修課
+
+>>比較愛探索？
+
+由表知道各系會因為畢業學分規定不同與本系所開設的選修課程多寡，導致外系修課數有所不同，所以在此我們將做標準化處理（減班平均處以班標準差）。
+因為要做標準差比較時會有延畢生在延畢學期無法跟同入學年的同學做標準化，故在建構特徵時，將以同系且同時期修課的同學定義做班標準化。
 
 ### 必修/選修/通識成績表現
 
@@ -343,7 +472,28 @@ df25=df
 df25 =df25.assign(pr=df25.groupby(['ClassId'])['學期成績'].rank(pct=True).mul(100))
 df25_1=df25.groupby(['學號','學年','學期'])['pr'].mean().reset_index(name = '學期pr平均')
 df = pd.merge(df,df25_1,on=['學號','學年','學期'],how='outer')
+
+
+dfclass25_1 = df.groupby(['學號','學年','學期'])['學期pr平均'].mean().reset_index()
+dfclass25_1 ['累積學期pr平均'] =dfclass25_1.groupby(['學號'])['學期pr平均'].apply(lambda x: x.cumsum().shift())
+dfclass25_1 = dfclass25_1.fillna(0)
+dfclass25_1 = dfclass25_1.drop('學期pr平均',axis=1)
+df = pd.merge(df,dfclass25_1,on=['學號','學年','學期'],how='outer')
 ```
+
+```{python}
+dfpic8 = df[df['修課幾學期'] >= 8]
+dfpic8['年級'] = dfpic8['系級'].str[-1]+ dfpic8['學期'].astype(str)
+dfpic8 = dfpic8.groupby(['學號','學年','學期','年級','是否被二一'])['累積學期pr平均'].mean().reset_index(name='累積學期pr平均')
+dfpic8['是否被二一'] = dfpic8['是否被二一'].astype(str)
+```
+
+```{r results='asis'}
+ggplot(py$dfpic8, aes(x =累積學期pr平均, y=年級, fill = 是否被二一)) + geom_density_ridges(alpha=0.55) +labs(x='累積學期pr平均',y = "年級",size=10) +scale_fill_discrete(name="是否被二一")
+```
+
+一上僅有被二一同學們的累積學期pr平均，原因為在一上被二一同學們可能會選擇休學再重修一上。
+從二年級開始可以明顯看到沒被二一的同學表現都比二一的同學來的好。
 
 ## 同儕面向
 ### 累計群聚指標
@@ -352,7 +502,7 @@ df = pd.merge(df,df25_1,on=['學號','學年','學期'],how='outer')
 同班定義為同系級且同學年學期修課者。
 同班不用入學年與系別定義的原因為，解決較晚入學者若同學們都畢業後會造成沒有班標準差的問題。
 創造作法為在同學期時同系級年級同學有多少人一起同時修該門課。
-由表X可觀察出各系的群聚指標會因為各系課程上的差異而有所差異，所以我們再將群聚指標做標準化（減去同班的平均再除以班上的標準差），作為解釋變數。
+
 
 ```{python 累計群聚指標特徵1}
 df26 = df.groupby(['ClassId','系別','入學年']).size().reset_index(name = '該班幾人修')
@@ -385,22 +535,35 @@ dfdd = pd.merge(df,df29,on=['系級','學年','學期'],how='outer')
 dfdd['標準化群聚指標'] = (dfdd['群聚指標'] - dfdd['班群聚平均數']) / dfdd['班群聚標準差']
 dfdd['標準化群聚指標']=dfdd['標準化群聚指標'].fillna(0)
 df30=dfdd.groupby(['學號','學年','學期'])['標準化群聚指標'].mean().reset_index()
-df30['累計標準化群聚指標'] = df30.groupby(['學號'])['標準化群聚指標'].apply(lambda x: x.cumsum())
-df30 = df30.drop(['標準化群聚指標'],axis=1)
+df30['累計標準化群聚指標'] = df30.groupby(['學號'])['標準化群聚指標'].apply(lambda x: x.cumsum().shift())
+df30 =df30.fillna(0)
+#df30 = df30.drop(['標準化群聚指標'],axis=1)
 df = pd.merge(df,df30,on=['學號','學年','學期'],how='outer')
 ```
 
+```{python}
+dfpic9 = df[df['修課幾學期'] >= 8]
+dfpic9['年級'] = dfpic9['系級'].str[-1] + dfpic9['學期'].astype(str)
+dfpic9 = dfpic9.groupby(['學號','學年','學期','年級','是否被二一'])['累計標準化群聚指標'].mean().reset_index(name='累計標準化群聚指標')
+dfpic9['是否被二一'] = dfpic9['是否被二一'].astype(str)
+```
+
+```{r results='asis'}
+ggplot(py$dfpic9, aes(x =累計標準化群聚指標, y=年級, fill = 是否被二一)) + geom_density_ridges(alpha=0.55) +labs(x='累計標準化群聚指標',y = "年級",size=10) +scale_fill_discrete(name="是否被二一")
+```
+
+二上開始可以明顯看到，被二一的學生們群聚指標往負的越來越多，造成的原因為他們開始回頭去修被當的科目，而此時班上的同學不會修該門課。
+
+由表可觀察出各系的群聚指標會因為各系課程上的差異而有所差異，所以我們再將群聚指標做標準化（減去同班的平均再除以班上的標準差），作為解釋變數。
+
 ### 同儕影響力
 
-除了捕捉到班上同學們群聚效果所營造出的學習環境外，好友之間的影響力也許也是一個可以觀察的變數，我們捕捉各個同學之中與自己課表重複度最高的同學當作該同學最好的朋友，將此好友修課面向的變數也列入欲預測同學的變數中。
+除了捕捉到班上同學們群聚效果所營造出的學習環境外，好友之間的影響力也許也是一個可以觀察的變數，我們捕捉各個同學之中與自己課表重複度最高的同學當作該同學最好的朋友，觀察此好友在前幾個學期被當比與pr的狀況，將此加入變數之中。
 
-```{python 同儕影響力}
+```{python 同儕影響力 }
 #====完整103~====
 dfk = df[(df['入學年']=='100') | (df['入學年']=='101') | (df['入學年']=='102') | (df['入學年']=='103')]
-dftest = dfk.groupby(['學號',"學期",'學年']).size().reset_index()
-dftest = dftest.groupby(['學號']).size().reset_index(name='修課幾學期')
-dfcomplete = pd.merge(dfk,dftest,on='學號',how='outer') 
-df103 = dfcomplete[dfcomplete['修課幾學期'] >= 8]
+df103 = dfk[dfk['修課幾學期'] >= 8]
 #========
 
 dftest=df103[df103['必選修類別（必／選／通）'] == '必']
@@ -433,6 +596,100 @@ dftest=dftest.drop(['學號_y'],axis=1)
 dftest.columns = ['學號','好友']
 df103 = pd.merge(df103,dftest,on=['學號'])
 ```
+```{python }
+df103_1 = df103[['好友','累積必修被當比']]
+df103_1.rename(columns={'好友':'學號'}, inplace=True)
+df103_1=df103_1.drop('累積必修被當比',axis=1)
+df103_2 = df103[['學號','累積必修被當比','累積選修被當比','累積通識被當比','累積學期pr平均']]
+df103_3 = pd.merge(df103_1,df103_2,on='學號',how='left')
+df103_3.rename(columns={'學號':'好友','累積必修被當比':'f累積必修被當比','累積選修被當比':'f累積選修被當比','累積通識被當比':'f累積通識被當比','累積學期pr平均':'f累積學期pr平均'}, inplace=True)
+df103_3 = df103_3.groupby(['好友'])['f累積必修被當比','f累積選修被當比','f累積通識被當比','f累積學期pr平均'].mean().reset_index()
+df103 = pd.merge(df103,df103_3,on='好友')
+```
+
+```{python}
+dfpic10 = df103[df103['修課幾學期'] >= 8]
+dfpic10['年級'] = dfpic10['系級'].str[-1]
+
+dfpic10_1 = dfpic10.groupby(['學號','學年','學期','年級','是否被二一'])['f累積必修被當比','累積必修被當比'].mean().reset_index()
+dfpic10_1['是否被二一'] = dfpic10_1['是否被二一'].astype(str)
+dfpic10_1 = dfpic10_1[(dfpic10_1['是否被二一']=='1') &(dfpic10_1['年級']!='1') ]
+
+dfpic10_2 = dfpic10.groupby(['學號','學年','學期','年級','是否被二一'])['f累積選修被當比','累積選修被當比'].mean().reset_index()
+dfpic10_2['是否被二一'] = dfpic10_2['是否被二一'].astype(str)
+dfpic10_2 = dfpic10_2[(dfpic10_2['是否被二一']=='1') &(dfpic10_2['年級']!='1') ]
+
+dfpic10_3 = dfpic10.groupby(['學號','學年','學期','年級','是否被二一'])['f累積通識被當比','累積通識被當比'].mean().reset_index()
+dfpic10_3['是否被二一'] = dfpic10_3['是否被二一'].astype(str)
+dfpic10_3 = dfpic10_3[(dfpic10_3['是否被二一']=='1') &(dfpic10_3['年級']!='1') ]
+
+dfpic10_4 = dfpic10.groupby(['學號','學年','學期','年級','是否被二一'])['累積學期pr平均','f累積學期pr平均'].mean().reset_index()
+dfpic10_4['是否被二一'] = dfpic10_4['是否被二一'].astype(str)
+dfpic10_4 = dfpic10_4[(dfpic10_4['年級']!='1') ]
+```
+
+```{r 定義合成圖公式}
+multiplot <- function(..., plotlist=NULL, file, cols=1, layout=NULL) {
+  require(grid)
+
+  # Make a list from the ... arguments and plotlist
+  plots <- c(list(...), plotlist)
+
+  numPlots = length(plots)
+
+  # If layout is NULL, then use 'cols' to determine layout
+  if (is.null(layout)) {
+    # Make the panel
+    # ncol: Number of columns of plots
+    # nrow: Number of rows needed, calculated from # of cols
+    layout <- matrix(seq(1, cols * ceiling(numPlots/cols)),
+                    ncol = cols, nrow = ceiling(numPlots/cols))
+  }
+
+ if (numPlots==1) {
+    print(plots[[1]])
+
+  } else {
+    # Set up the page
+    grid.newpage()
+    pushViewport(viewport(layout = grid.layout(nrow(layout), ncol(layout))))
+
+    # Make each plot, in the correct location
+    for (i in 1:numPlots) {
+      # Get the i,j matrix positions of the regions that contain this subplot
+      matchidx <- as.data.frame(which(layout == i, arr.ind = TRUE))
+
+      print(plots[[i]], vp = viewport(layout.pos.row = matchidx$row,
+                                      layout.pos.col = matchidx$col))
+    }
+  }
+}
+```
+
+
+```{r results='asis'}
+p1 <- ggplot(py$dfpic10_1, aes(x=f累積必修被當比, y=累積必修被當比, color=年級)) + 
+    geom_point(size=2, alpha=0.8)+labs(x='f累積必修被當比',y = "累積必修被當比",size=10) +scale_fill_discrete(name="年級") + scale_colour_manual(name = "年級",values = c("light green", "skyblue",'pink'))+
+  geom_smooth(method = "lm", color="red", linetype=2)
+
+p2 <- ggplot(py$dfpic10_2, aes(x=f累積選修被當比, y=累積選修被當比, color=年級)) + 
+    geom_point(size=2, alpha=0.8)+labs(x='f累積選修被當比',y = "累積選修被當比",size=10) +scale_fill_discrete(name="年級") +scale_fill_discrete(name="年級") + scale_colour_manual(name = "年級",values = c("light green", "skyblue",'pink'))+
+  geom_smooth(method = "lm", color="red", linetype=2)
+
+p3 <- ggplot(py$dfpic10_3, aes(x=f累積通識被當比, y=累積通識被當比, color=年級)) + 
+    geom_point(size=2, alpha=0.8)+labs(x='f累積通識被當比',y = "累積通識被當比",size=10) +scale_fill_discrete(name="年級")+scale_fill_discrete(name="年級") + scale_colour_manual(name = "年級",values = c("light green", "skyblue",'pink'))+
+  geom_smooth(method = "lm", color="red", linetype=2)
+
+p4 <- ggplot(py$dfpic10_4, aes(x=f累積學期pr平均, y=累積學期pr平均, color=年級)) + 
+    geom_point(size=2, alpha=0.8)+labs(x='f累積學期pr平均',y = "累積學期pr平均",size=10) +scale_fill_discrete(name="年級")+scale_fill_discrete(name="年級") + scale_colour_manual(name = "年級",values = c("light green", "skyblue",'pink'))+
+  geom_smooth(method = "lm", color="red", linetype=2)
+
+multiplot(p1, p2, p3, p4, cols=2)
+```
+
+去掉一年級主要的原因為一上大多都無累積學期pr，為了讓圖能夠更好觀察，所以簡化。
+在圖一、圖四必修中明顯的看到不管大幾朋友間都會有很明顯的正相關影響。
+>> Q:圖二、圖三
 
 
 ## 欲預測學期面向
@@ -446,18 +703,118 @@ b2=b1.reset_index()
 b2=pd.melt(b2, id_vars=["index"], 
                   var_name="入學年", value_name="系必修數")
 b2.columns=['系別','入學年','系必修數']
-#=====
+
 df=pd.merge(df,b2,on = ['系別','入學年'],how='outer')
 df['該學期必修修課比例'] = df['當學期必修修課數']/df['系必修數']
+df=pd.merge(df103,df,how='inner')
+```
+
+```{python}
+dfpic11 = df[df['修課幾學期'] >= 8]
+dfpic11['年級'] = dfpic11['系級'].str[-1] + dfpic11['學期'].astype(str)
+dfpic11 = dfpic11.groupby(['學號','學年','學期','年級','是否被二一'])['該學期必修修課比例'].mean().reset_index(name='該學期必修修課比例')
+dfpic11['是否被二一'] = dfpic11['是否被二一'].astype(str)
+```
+
+```{r results='asis'}
+ggplot(py$dfpic11, aes(x=年級, y=該學期必修修課比例, fill=是否被二一))+ geom_boxplot() 
+```
+
+
+
+
+```{python 簡化df}
+
+df=df.drop(['Unnamed: 0', 'index', '系級', '姓名', '學期成績', '科目代碼', '科目名稱', '學分數','開課系所', '修課人數', '班別', '授課老師','必選修類別（必／選／通）','授課語言','上課時間及教室','系別','ClassId','mainstudent','mainnumber','mainQ2/3','mainQ1/2', 'main1/2college','該班人數','名稱', '不及格','實拿學分','該班幾人修'],axis=1)
+#print(df.info())
+df881=df.drop_duplicates()
+#print(df881.info())
+df882=df881.groupby(['學號','學年','學期']).size().reset_index(name='temp')
+df882=df882.drop(['temp'],axis=1)
+df883=pd.merge(df882,df881,on=['學號','學年','學期'],how='outer')
 ```
 
 # 模型設計
 
+X修課面相特徵、Z同儕面相特徵、W欲預測學期課特徵
+是否會被二一的Y變數是反映了學生在學適應狀況Y*，如下：
+
+$$
+\begin{array}{lcl}
+Y_{i}^*&=&\beta_0+\beta_1 X_{i}+\beta_2 Z_{i}+\beta_3 W_{i}+\epsilon_{i}\\
+Y_{i}&=&I(Y_{i}^*>0),
+\end{array}
+$$
+其中Y=1代表本學期會21，Y=0代表不會。假設$\epsilon$ CDF為logistic, 則：
+
+CDF: logistic
+$$
+\Pr(Y=1|feature, X)=\frac{exp(X\beta)}{1+exp(X\beta)}
+$$
 
 
+### 變數間的相關
 
+```{python 放最後}
+dfpic9 = df[df['修課幾學期'] >= 8]
+#dfpic9=dfpic9.drop(['Unnamed: 0', 'index', '系級', '姓名', '學期成績', '科目代碼', '科目名稱', '學分數','開課系所', '修課人數', '班別', '授課老師','必選修類別（必／選／通）','授課語言','上課時間及教室','系別','ClassId','mainstudent','mainnumber','mainQ2/3','mainQ1/2', 'main1/2college','該班人數','名稱', '不及格','實拿學分'],axis=1)
+dfpic9_1=dfpic9.drop_duplicates()
+dfpic9_2=dfpic9_1.groupby(['學號','學年','學期']).size().reset_index(name='temp')
+dfpic9_2=dfpic9_2.drop(['temp'],axis=1)
+dfpic9_2=pd.merge(dfpic9_2,dfpic9_1,on=['學號','學年','學期'],how='outer')
+#必修
+dfpic9_2 ['本期必修被當比'] =dfpic9_2['必修被當']/dfpic9_2['當學期必修修課數']
+dfpic9_3 = dfpic9_2.groupby(['學號','學年','學期'])['本期必修被當比'].mean().reset_index()
+dfpic9_2['前期必修被當比'] = dfpic9_3.groupby(['學號'])['本期必修被當比'].shift()
+#選修
+dfpic9_2 ['本期選修被當比'] =dfpic9_2['選修被當']/dfpic9_2['當學期選修修課數']
+dfpic9_3 = dfpic9_2.groupby(['學號','學年','學期'])['本期選修被當比'].mean().reset_index()
+dfpic9_2['前期選修被當比'] = dfpic9_3.groupby(['學號'])['本期選修被當比'].shift()
+#通識
+dfpic9_2 ['本期通識被當比'] =dfpic9_2['通識被當']/dfpic9_2['當學期通識修課數']
+dfpic9_3 = dfpic9_2.groupby(['學號','學年','學期'])['本期通識被當比'].mean().reset_index()
+dfpic9_2['前期通識被當比'] = dfpic9_3.groupby(['學號'])['本期通識被當比'].shift()
+#外系
+dfpic9_3 = dfpic9_2.groupby(['學號','學年','學期'])['外系標準化修課數'].mean().reset_index()
+dfpic9_2['前期外系標準化修課數'] = dfpic9_3.groupby(['學號'])['外系標準化修課數'].shift()
+#pr
+dfpic9_3 = dfpic9_2.groupby(['學號','學年','學期'])['學期pr平均'].mean().reset_index()
+dfpic9_2['前期學期pr平均'] = dfpic9_3.groupby(['學號'])['學期pr平均'].shift()
+#群聚
+dfpic9_3 = dfpic9_2.groupby(['學號','學年','學期'])['標準化群聚指標'].mean().reset_index()
+dfpic9_2['前期標準化群聚指標'] = dfpic9_3.groupby(['學號'])['標準化群聚指標'].shift()
+#同儕
+dfpic9_4 = dfpic9_2.groupby(['學號','學年','學期'])['f累積必修被當比','f累積選修被當比','f累積通識被當比','f累積學期pr平均'].mean().reset_index()
+dfpic9_2['前期f累積必修被當比'] = dfpic9_4.groupby(['學號'])['f累積必修被當比'].shift()
+dfpic9_2['前期f累積選修被當比'] = dfpic9_4.groupby(['學號'])['f累積選修被當比'].shift()
+dfpic9_2['前期f累積通識被當比'] = dfpic9_4.groupby(['學號'])['f累積通識被當比'].shift()
+dfpic9_2['前期f累積學期pr平均'] = dfpic9_4.groupby(['學號'])['f累積學期pr平均'].shift()
+#fill
+dfpic9_2 = dfpic9_2.fillna(0)
+dfpic9_2 = dfpic9_2.drop(['學號', '學年', '學期','修課幾學期', '必修被當', '當學期必修修課數','累積必修修課數', '累積必修被當', '選修被當', '當學期選修修課數', '累積選修修課數', '累積選修被當','通識被當', '當學期通識修課數', '累積通識修課數', '累積通識被當','個人外系修課數', '班平均', '班標準差', '外系標準化修課數','學期pr平均','本期必修被當比','本期選修被當比','本期通識被當比','學期pr平均','標準化群聚指標','累計群聚指標','群聚指標','系必修數'],axis=1)
+dfpic9_2=dfpic9_2.drop(['入學年','好友'],axis=1)
 
+#pic2
+dfpic99 = df.drop(['學號', '學年', '學期', '入學年','修課幾學期', '必修被當', '當學期必修修課數','選修被當','累積必修修課數', '累積必修被當', '當學期選修修課數','通識被當', '當學期通識修課數','累積通識修課數', '累積通識被當','個人外系修課數', '班平均', '班標準差', '外系標準化修課數','學期pr平均','群聚指標', '累計群聚指標', '標準化群聚指標','好友','系必修數','累積選修被當','累積選修修課數'],axis=1)
+```
+```{r results='asis'}
+library(GGally)
+ggcorr(py$dfpic9_2,geom="circle", size = 2,,method = c("everything", "pearson"))
 
+ggcorr(py$dfpic99,geom="circle", size = 2,,method = c("everything", "pearson"))
+```
 
+圖一：想解決「為什麼要用累積而不用只看前一期?」
 
+-  兩者對於二一的相關性都差不多，「保留累計的特徵可以收集到比較多資訊嗎」，跟21的相關係數都很低，可能原因為被二一資料筆數太少。
+
+圖二：
+
+- 累積必修被當比與好友累積必修被當比呈高度正相關。
+
+- 累積選修修課數與該學期必修修課比例呈負相關。
+
+- 累積學期pr平均與該學期必修修課比例呈負相關。
+
+- 好友累積必修被當比與好友累積通識被當比呈負相關。
 
