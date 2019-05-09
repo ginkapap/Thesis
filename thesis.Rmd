@@ -137,8 +137,10 @@ ggplot(py$dfpic2_1, aes(x = 入學年, fill = 二一)) +
 ```
 
 上圖可以知道兩點：
-  - 入學年對於同學被二一的狀況是沒有太大的差異的，被二一的比例皆差不多。
-  - 資料中被二一的人數很少， 所以模型的預測結果應該以召回率來看（預測=1/現實=1；較可以接受type 1 error）。
+
+-  入學年對於同學被二一的狀況是沒有太大的差異的，被二一的比例皆差不多。
+
+-  資料中被二一的人數很少， 所以模型的預測結果應該以召回率來看（預測=1/現實=1；較可以接受type 1 error）。
 
 
 ```{python 圖}
@@ -740,25 +742,6 @@ df882=df882.drop(['temp'],axis=1)
 df883=pd.merge(df882,df881,on=['學號','學年','學期'],how='outer')
 ```
 
-# 模型設計
-
-X修課面相特徵、Z同儕面相特徵、W欲預測學期課特徵
-是否會被二一的Y變數是反映了學生在學適應狀況Y*，如下：
-
-$$
-\begin{array}{lcl}
-Y_{i}^*&=&\beta_0+\beta_1 X_{i}+\beta_2 Z_{i}+\beta_3 W_{i}+\epsilon_{i}\\
-Y_{i}&=&I(Y_{i}^*>0),
-\end{array}
-$$
-其中Y=1代表本學期會21，Y=0代表不會。假設$\epsilon$ CDF為logistic, 則：
-
-CDF: logistic
-$$
-\Pr(Y=1|feature, X)=\frac{exp(X\beta)}{1+exp(X\beta)}
-$$
-
-
 # 各變數間的相關
 
 ```{python 放最後}
@@ -823,3 +806,20 @@ ggcorr(py$dfpic99,geom="circle", size = 2,,method = c("everything", "pearson"))
 
 - 好友累積必修被當比與好友累積通識被當比呈負相關。
 
+# 模型設計
+
+X修課面相特徵、Z同儕面相特徵、W欲預測學期課特徵
+是否會被二一的Y變數是反映了學生在學適應狀況Y*，如下：
+
+$$
+\begin{array}{lcl}
+Y_{i}^*&=&\beta_0+\beta_1 X_{i}+\beta_2 Z_{i}+\beta_3 W_{i}+\epsilon_{i}\\
+Y_{i}&=&I(Y_{i}^*>0),
+\end{array}
+$$
+其中Y=1代表本學期會21，Y=0代表不會。假設$\epsilon$ CDF為logistic, 則：
+
+CDF: logistic
+$$
+\Pr(Y=1|feature, X)=\frac{exp(X\beta)}{1+exp(X\beta)}
+$$
