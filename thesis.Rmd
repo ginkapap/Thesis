@@ -28,6 +28,7 @@ library(lubridate)
 library(tidyr)
 library(showtext)
 library(ggridges)
+library(GGally)
 #font_add("QYuan","cwTeXQYuan-Medium.ttf")
 showtext_auto(enable=TRUE)
 theme_set(theme_classic())
@@ -451,13 +452,13 @@ ggplot(py$dfpic7, aes(x=年級, y=累計外系修課指標, fill=是否被二一
 py$dftemp1 %>% DT::datatable()
 ```
 
-二上、四下： 二一高，代表一下、四上瞬間快速累積外系修課
+在二上、四下時，被二一類型的學生較高，代表一下、四上瞬間快速累積外系修課。
+>>四下高的原因可是是因為四上去修很多外系開的必/選修課，想要快點畢業。
+>>一下高的原因為可能被擋修，所以先去修外系的課。
 
->>四下高的原因可是是因為四上去修很多外系開的必/選修課？想要快點畢業
+在二下、三上時，沒被二一類型的學生高，代表二上、二下瞬間快速累積外系修課。
 
-二下、三上：沒二一高，代表二上二下瞬間快速累積外系修課
-
->>比較愛探索？
+>>可能的原因為「比較愛探索？」
 
 由表知道各系會因為畢業學分規定不同與本系所開設的選修課程多寡，導致外系修課數有所不同，所以在此我們將做標準化處理（減班平均處以班標準差）。
 因為要做標準差比較時會有延畢生在延畢學期無法跟同入學年的同學做標準化，故在建構特徵時，將以同系且同時期修課的同學定義做班標準化。
@@ -488,7 +489,7 @@ dfpic8 = dfpic8.groupby(['學號','學年','學期','年級','是否被二一'])
 dfpic8['是否被二一'] = dfpic8['是否被二一'].astype(str)
 ```
 
-```{r results='asis'}
+```{r results='asis',message=FALSE}
 ggplot(py$dfpic8, aes(x =累積學期pr平均, y=年級, fill = 是否被二一)) + geom_density_ridges(alpha=0.55) +labs(x='累積學期pr平均',y = "年級",size=10) +scale_fill_discrete(name="是否被二一")
 ```
 
@@ -548,7 +549,7 @@ dfpic9 = dfpic9.groupby(['學號','學年','學期','年級','是否被二一'])
 dfpic9['是否被二一'] = dfpic9['是否被二一'].astype(str)
 ```
 
-```{r results='asis'}
+```{r results='asis',message=FALSE}
 ggplot(py$dfpic9, aes(x =累計標準化群聚指標, y=年級, fill = 是否被二一)) + geom_density_ridges(alpha=0.55) +labs(x='累計標準化群聚指標',y = "年級",size=10) +scale_fill_discrete(name="是否被二一")
 ```
 
@@ -667,7 +668,7 @@ multiplot <- function(..., plotlist=NULL, file, cols=1, layout=NULL) {
 ```
 
 
-```{r results='asis'}
+```{r results='asis',message=FALSE}
 p1 <- ggplot(py$dfpic10_1, aes(x=f累積必修被當比, y=累積必修被當比, color=年級)) + 
     geom_point(size=2, alpha=0.8)+labs(x='f累積必修被當比',y = "累積必修被當比",size=10) +scale_fill_discrete(name="年級") + scale_colour_manual(name = "年級",values = c("light green", "skyblue",'pink'))+
   geom_smooth(method = "lm", color="red", linetype=2)
@@ -688,8 +689,10 @@ multiplot(p1, p2, p3, p4, cols=2)
 ```
 
 去掉一年級主要的原因為一上大多都無累積學期pr，為了讓圖能夠更好觀察，所以簡化。
+
 在圖一、圖四必修中明顯的看到不管大幾朋友間都會有很明顯的正相關影響。
->> Q:圖二、圖三
+
+Q:圖二、圖三接近水平，可能比較沒有明顯的關係。
 
 
 ## 欲預測學期面向
@@ -716,10 +719,13 @@ dfpic11 = dfpic11.groupby(['學號','學年','學期','年級','是否被二一'
 dfpic11['是否被二一'] = dfpic11['是否被二一'].astype(str)
 ```
 
-```{r results='asis'}
-ggplot(py$dfpic11, aes(x=年級, y=該學期必修修課比例, fill=是否被二一))+ geom_boxplot() 
+```{r results='asis',warning=FALSE}
+ggplot(py$dfpic11, aes(x=年級, y=該學期必修修課比例, fill=是否被二一))+ geom_boxplot() + ylim(0,0.8)
 ```
 
+-  二年級時，被二一之課業程度的指標略低於沒被二一，可能原因為被擋修，所以課業繁重程度會比較低。
+
+-  三上開始被二一類型的同學必修修課比例會上升，原因為他們開始回去修以前的科目，也就是說他們該學期的課業繁重程度會開始上升。
 
 
 
@@ -753,7 +759,7 @@ $$
 $$
 
 
-### 變數間的相關
+# 各變數間的相關
 
 ```{python 放最後}
 dfpic9 = df[df['修課幾學期'] >= 8]
@@ -797,8 +803,7 @@ dfpic9_2=dfpic9_2.drop(['入學年','好友'],axis=1)
 #pic2
 dfpic99 = df.drop(['學號', '學年', '學期', '入學年','修課幾學期', '必修被當', '當學期必修修課數','選修被當','累積必修修課數', '累積必修被當', '當學期選修修課數','通識被當', '當學期通識修課數','累積通識修課數', '累積通識被當','個人外系修課數', '班平均', '班標準差', '外系標準化修課數','學期pr平均','群聚指標', '累計群聚指標', '標準化群聚指標','好友','系必修數','累積選修被當','累積選修修課數'],axis=1)
 ```
-```{r results='asis'}
-library(GGally)
+```{r results='asis',message=FALSE}
 ggcorr(py$dfpic9_2,geom="circle", size = 2,,method = c("everything", "pearson"))
 
 ggcorr(py$dfpic99,geom="circle", size = 2,,method = c("everything", "pearson"))
@@ -806,7 +811,7 @@ ggcorr(py$dfpic99,geom="circle", size = 2,,method = c("everything", "pearson"))
 
 圖一：想解決「為什麼要用累積而不用只看前一期?」
 
--  兩者對於二一的相關性都差不多，「保留累計的特徵可以收集到比較多資訊嗎」，跟21的相關係數都很低，可能原因為被二一資料筆數太少。
+-  兩者對於二一的相關性都差不多，「保留累計的特徵可以收集到比較多資訊」，跟21的相關係數都很低，可能原因為被二一資料筆數太少。
 
 圖二：
 
