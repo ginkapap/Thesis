@@ -838,7 +838,7 @@ X修課面相特徵、Z同儕面相特徵、W欲預測學期課特徵
 
 $$
 \begin{array}{lcl}
-Y_{i}^*&=&\beta_0+\beta_1 X_{i}+\beta_2 Z_{i}+\beta_3 W_{i}+\epsilon_{i} +懲罰向\\
+Y_{i}^*&=&\beta_0+\beta_1 X_{i}+\beta_2 Z_{i}+\beta_3 W_{i}+\epsilon_{i} + \lambda\sum_{i=1}^{n} \beta_i^2 \\
 
 Y_{i}&=&I(Y_{i}^*>0),
 \end{array}
@@ -849,6 +849,7 @@ CDF: logistic
 $$
 \Pr(Y=1|feature, X)=\frac{exp(X\beta)}{1+exp(X\beta)} 
 $$
+## Penalized Logistic Regression(L2 Penalty)
 
 ```{r}
 trainIndices = createDataPartition(py$dfpn$是否被二一, p=.8, list=F)
