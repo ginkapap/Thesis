@@ -789,14 +789,14 @@ ggplot(py$dfpic11, aes(x=年級, y=該學期必修修課比例, fill=是否被�
 # 各變數間的相關
 
 ```{python}
-dfpic9 = df[df['修課幾學期'] >= 8]
 df['年級'] = df['系級'].str[-1].astype(str) + df['學期'].astype(str)
+dfpic9 = df[df['修課幾學期'] >= 8]
 dfpic9=dfpic9.drop(['Unnamed: 0', 'index', '系級', '姓名', '學期成績', '科目代碼', '科目名稱', '學分數','開課系所', '修課人數', '班別', '授課老師','必選修類別（必／選／通）','授課語言','上課時間及教室','系別','ClassId','mainstudent','mainnumber','mainQ2/3','mainQ1/2', 'main1/2college','該班人數','名稱', '不及格','實拿學分'],axis=1)
 dfpic9_1=dfpic9.drop_duplicates()
 dfpic9_2=dfpic9_1.groupby(['學號','學年','學期']).size().reset_index(name='temp')
 dfpic9_2=dfpic9_2.drop(['temp'],axis=1)
 dfpn=pd.merge(dfpic9_2,dfpic9_1,on=['學號','學年','學期'],how='outer')
-dfpn = dfpn[['系別','學號','學年','學期','年級','是否被二一','累計標準化群聚指標','累計外系修課指標','累積通識被當比','累積選修被當比','累積必修被當比','f累積通識被當比','f累積選修被當比','f累積必修被當比','該學期必修修課比例','GPA']]
+dfpn = dfpn[['學號','學年','學期','年級','是否被二一','累計標準化群聚指標','累計外系修課指標','累積通識被當比','累積選修被當比','累積必修被當比','f累積通識被當比','f累積選修被當比','f累積必修被當比','該學期必修修課比例','GPA']]
 dfpn=dfpn.drop_duplicates()
 dfpn = dfpn.drop(['學號','學年','學期'],axis=1)
 dfpn = dfpn[dfpn['年級'] != '11']
@@ -838,7 +838,10 @@ X修課面相特徵、Z同儕面相特徵、W欲預測學期課特徵
 
 $$
 \begin{array}{lcl}
-Y_{i}^*&=&\beta_0+\beta_1 X_{i}+\beta_2 Z_{i}+\beta_3 W_{i}+\epsilon_{i} + \lambda\sum_{i=1}^{n} \beta_i^2 \\
+Y_{i}^*&=&\beta_0+\beta_1 X_{i}+\beta_2 Z_{i}+\beta_3 W_{i}+\epsilon_{i}  \\
+
+cost function&=& \sum_{i=1}^{n} Y_{i} -(\beta_0+\beta_1 X_{i}+\beta_2 Z_{i}+\beta_3 W_{i})]^2 + \lambda\sum_{i=1}^{n} \beta_i^2 
+\\
 
 Y_{i}&=&I(Y_{i}^*>0),
 \end{array}
@@ -859,24 +862,19 @@ test <- py$dfpn[-trainIndices,]
 good_observed =test$是否被二一
 cv_opts = trainControl(method='cv', number=10)
 ```
-```{r}
+```{r results='asis'}
 results_plr = train(是否被二一~., 
                      data=train, 
                      trControl = cv_opts,
                      method='plr')
 
 results_plr
-ggplot(results_plr)
+#ggplot(results_plr)
 preds_plr = predict(results_plr, test)
-length(preds_plr)
-length(good_observed)
+#length(preds_plr)
+#length(good_observed)
 
 confusionMatrix(table(preds_plr, good_observed))
 ```
 
-結果：Sensitivity (召回率): 0.02532 
-
-# 補充
-
-<img src='https://imgur.com/GLHc5Zu.jpg'>
 
