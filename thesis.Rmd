@@ -10,9 +10,7 @@ output:
       smooth_scroll: false
 ---
 
-
-
-
+#處理
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = FALSE,fig.showtext=TRUE, results = "hide",warning = FALSE)
 library(dplyr)
@@ -32,6 +30,8 @@ library(ggridges)
 library(GGally)
 library(caret)
 library(plotROC)
+library(DMwR)
+library(ROSE)
 #font_add("QYuan","cwTeXQYuan-Medium.ttf")
 showtext_auto(enable=TRUE)
 theme_set(theme_classic())
@@ -43,7 +43,6 @@ use_condaenv("ginkapap")
 #conda_install(envname = "ginkapap",c("keras",'tensorflow'))
 #py_available()
 ```
-
 ```{r 定義合成圖公式}
 multiplot <- function(..., plotlist=NULL, file, cols=1, layout=NULL) {
   require(grid)
@@ -81,8 +80,6 @@ multiplot <- function(..., plotlist=NULL, file, cols=1, layout=NULL) {
   }
 }
 ```
-
-
 ```{python 匯入資料}
 import pandas as pd
 import numpy as np
@@ -125,32 +122,12 @@ df9798 = df.groupby(['學號','入學年','系別']).size().reset_index(name='�
 
 #df = df[(df['入學年'] != '998') & (df['入學年'] != '997') & (df['入學年'] != '967') & (df['入學年'] != '968')& (df['入學年'] != '977') & (df['入學年'] != '978') & (df['入學年'] != '987') & (df['入學年'] != '988')]
 ```
-```{r ,eval=FALSE}
-py$df9798%>% DT::datatable()
-#觀察到一些入學年9開頭的資料不完整，最後刪去這些年的資料。
-```
-
-
-
-
-# 目的
-
-以往由老師發送期中預警給學生時通常學期已過一半，難以在學生遇到學習困難的初期給予協助，希望藉由二一預測能提早觀察出哪些學生是需要被特別關心的，藉由前幾學期的修課面向、同儕之間的關係面向、欲預測學期的課程面向；預測下一學期是否會被二一，其中一年級上學期尚未進入本校沒有足夠的資料來預測，故不列入預測的範圍之中。
-
-# 資料處理
-
-## 被解釋變數
-
-原始資料為99年至106年學生各科成績分數資料，將排除修課學期不滿八學期者，僅使用100年到103年入學且有完整8學期資料者為本篇分析資料，圖為100至103年二一狀況。
-
 ```{python 被解釋21標籤}
 df21 = df.groupby(['學號','學年','學期'])['實拿學分','學分數'].sum().reset_index()
 df21['是否被二一'] = np.where(df21['實拿學分']/df21['學分數'] <= 1/2 ,1 ,0)
 df21=df21.drop(['實拿學分','學分數'],axis=1)
 df=pd.merge(df,df21,on = ['學號','學年','學期'],how='outer')
 ```
-
-
 ```{python 二一圖}
 #去掉修課不滿八學期者
 dftestt = pd.DataFrame(df.groupby(['學號',"學期",'學年']).size().reset_index())
@@ -166,19 +143,6 @@ df4 = df3.groupby('二一次數').size().reset_index(name = '人數')
 #dfpic4_1=dfpic.groupby(['學號','學年','學期'])['是否被二一'].mean().reset_index()
 #dfpic4_1['是否被二一'] = dfpic4_1['是否被二一'].astype(str)
 ```
-
-```{r 1, results="asis" }
-py$df4 %>% DT::datatable()
-
-#ggplot(py$df4, aes(x=二一次數, y=人數)) +
-#  geom_segment( aes(x=二一次數, xend=二一次數, y=0, yend=人數), color="grey") +
-#  geom_point(color="orange", size=2) +coord_flip() 
-
-ggplot(py$df4 , aes(x= 二一次數,y=人數)) + geom_bar(stat="identity") + coord_flip()
-```
-
-從100學年度起至103學入學年，擁有完整八學期的學生中，共有4941位學生資料，其中學生被二一的紀錄有364筆，由上圖可知在被二一的同學之中被二一壹次的紀錄最多筆，共有295筆，被二一兩次的有46筆；三次以上則有23筆，學生被二一次數超過兩次的原因為僑生與身心障礙者不適用於學校中雙二一的規定。
-
 ```{python }
 dfpic2 = dfpic.groupby(['學號','入學年','是否被二一']).size().reset_index(name='t')
 dfpic2['是否被二一']=dfpic2['是否被二一'].astype(int)
@@ -186,21 +150,6 @@ dfpic2_1 = dfpic2.groupby(['學號','入學年'])['是否被二一'].sum().reset
 dfpic2_1['二一']=dfpic2_1['二一'].astype(str)
 dfpic2_1['入學年']=dfpic2_1['入學年'].astype(str)
 ```
-```{r}
-ggplot(py$dfpic2_1, aes(x = 入學年, fill = 二一)) +  
-  geom_bar(position = "fill") +
-  labs(x='入學年',y = "比例",size=10) +
-  scale_fill_discrete(name="二一")+ scale_y_continuous(breaks=seq(0,1,0.1))
-```
-
-上圖可以知道兩點
-
--  入學年對於同學被二一的狀況是沒有太大的差異的，被二一的比例皆差不多所以模型中將不使用此變數。
-
--  資料中被二一的人數很少， 所以模型的預測結果不應該單純以準確率來看。
-
-### 曾被二一過幾次特徵
-
 ```{python 是否被二一過}
 df['年級'] = df['系級'].str[-1] + df['學期'].astype(str)
 df21cum = df.groupby(['學號','年級','系別','是否被二一']).size().reset_index(name='t')
@@ -211,7 +160,6 @@ df21cum1=df21cum1.fillna(0)
 df21cum1 = df21cum1.drop(['二一'],axis=1)
 df=pd.merge(df,df21cum1,on=['學號','年級','系別'],how='outer')
 ```
-
 ```{python 圖}
 dfpic['年級'] = dfpic['系級'].str[-1] + dfpic['學期'].astype(str)
 dfpic3 = dfpic.groupby(['學號','年級','系別','是否被二一']).size().reset_index(name='t')
@@ -230,68 +178,6 @@ dfpic3_1=dfpic3_1.fillna(0)
 dfpic3_1['累積二一'] = dfpic3_1['累積二一'].astype(int)
 dfpic3_1['累積二一'] = dfpic3_1['累積二一'].astype(str)
 ```
-```{r}
-#ggplot(py$dfpic3_1, aes(x = 系別, fill = 年級)) +  
-#  geom_bar(position = "dodge") +coord_flip()+labs(x='數目',y = "系別",size=10) +scale_fill_discrete(name="年級")
-
-#ggplot(py$dfpic3_1, aes(x = 系別, fill = 年級)) +  
-#  geom_bar(position = "fill") + coord_flip()+labs(x="系別",y = '數目',size=10) +scale_fill_discrete(name="年級")
-
-ggplot(py$dfpic3_1, aes(x = 年級,fill = 累積二一)) +  
-  geom_bar()
-
-#ggplot(py$dfpic3_1, aes(x = 系別)) +  
-# geom_bar() + coord_flip()
-```
-
-一年級被二一的人數是最多的，反映了這些被二一的學生中，有很大的部分是不適應上大學後的生活，而另外一個高峰在大四，有兩種可能；第一種為大四課比較少所以若有幾門課被當便會造成二一；第二種為途中看到大四中有快一半的人數是有被二一過的，代表被二一過的同學大四時有很大的機率會延續之前的學習狀態導致大四被二一進而影響畢業，通過以上觀察將加入變數曾被二一過次數當作解釋變數。
-
-## 修課面向
-
-### 累計被當比
-
-成績單資料中提供最主要的訊息為學生的學習狀況，由上節分析可以得知被二一過的學生在被二一的機率很高，代表學生在學習上可能出了問題，在此以同學歷年來的修課狀況與紀錄來建構學生被當的狀況，變數分別為；累計專業必修被當比例、累計共同必修被當比例、累計其他必修被當比例、累計選修被當比例以及累計通識被當比例作為捕捉修課面向的特徵，選擇比例而非堂數的原因為每人的修課數會受到個人是否雙主修、輔修、教育學程或是不同入學年系級的影響。
-
-將必修分為三類討論，第一類為專業必修，專業必修定義為班上超過五成人所修習之必修，此專業必修的定義較接近為系上的必修科目，因為必須達到五成以上的同學的修課條件，可以排除雙主修等課程的影響；第二類為全校共同必修，涵蓋體育、英文、軍訓、國文，此類相對專業科目來說負擔較輕，從此特徵可以看出大學授課適應不良的學生；第三類為其他類，及排除上兩類後剩下成績單中所顯示為必修的科目，及雙主修、輔修、教育學程同學所多出的科目。
-
-```{python 製作專業必修課程,eval=FALSE}
-#計算各科目中各班幾人修
-#計算累計必修專業科目被當，各同學會因為修教育學分、雙主修等因素影響而導致成績單中所顯示的必修課並非真的為該系的必修專業科目，故在此建立新的必修的算法將共同必修、軍訓課與體育課先去除掉，再將同入學年且同班別系級的同學定義為同班，利用同班中若有五成以上的同學修該門必修課則列入必修專業科目。
-df5 = df[df['必選修類別（必／選／通）']=='必']
-df5 = df5[df5['開課系所'] != '軍訓（必選修）']
-df5 = df5[df5['名稱'] != '體育']
-df5 = df5[(df5['科目名稱'] !='大一國文：經典閱讀與詮釋') &(df5['科目名稱'] !='國文：經典閱讀與詮釋') & (df5['科目名稱'] !='大學英文：英語聽講練習')  & (df5['科目名稱'] !='大學英文') & (df5['科目名稱'] !='英語聽講練習') & (df5['科目名稱'] !='英文') & (df5['科目名稱'] !='歷史')]
-df5['不及格']=np.where(df5['學期成績'] < 60 , 1 , 0)
-df5=df5[df5['不及格'] != 1]
-
-df5_1 = df5.groupby(['科目名稱','系別','入學年']).size().reset_index(name = '該課被該班修過幾次')
-df5 = pd.merge(df5,df5_1,on=['科目名稱','系別','入學年'],how='left')
-#若該班修課人數>該班人數的5成則那門課算為必修課
-df5['是否為必修'] = np.where((df5['該課被該班修過幾次']/df5['該班人數']) >= 0.5 , 1 , 0)
-#建造一個list含有所有系別名稱
-a=[]
-dfname = df.groupby(['系別']).size().reset_index()
-for x in dfname['系別']:
-  a.append(x)
-#利用迴圈建造各系各年級必修課的dataframe，並加入list中
-b=[]
-for i in range(len(a)):
-  dfchg = (df5[(df5['系別'] == a[i]) & (df5['是否為必修'] == 1)])
-  dfchg = dfchg.groupby(['科目名稱','入學年']).size().reset_index(name=a[i])
-  dfchg = dfchg.groupby(['入學年'])['科目名稱'].size().reset_index(name=a[i])
-  b.append(dfchg)
-#將各個dataframe從list中拿出並合併
-b1=pd.merge(b[0],b[1])
-count = 0
-for i in range(len(b)):
-    b1=pd.merge(b1,b[i],how = 'outer')
-b1 = (b1.T)
-b1.drop(b1.index[0], inplace=True)
-b1.fillna(0,inplace=True)
-b1.columns = ['100','101','102','103','104','105','106']
-b1=b1.drop(['104','105','106'],axis=1)
-```
-
 ```{python 貼上累計專業必修被當比特徵}
 #計算各系專業必修
 #貼上特徵
@@ -334,20 +220,13 @@ df=pd.merge(df,dfrequiredg3,on = ['學號','學年','學期'],how='outer')
 df['累積專業必修被當比'] = df['累積專業必修被當'] / df['累積專業必修修課數']
 df = df.fillna(0)
 ```
-
 ```{python 必圖}
 dfpic4 = df[df['修課幾學期'] >= 8]
 dfpic4['年級'] = dfpic4['系級'].str[-1] + dfpic4['學期'].astype(str)
 #print(dfclass1_1_1[dfclass1_1_1['學號']==410071464])
-dfpic4 = dfpic4.groupby(['學號','學年','學期','年級','是否被二一'])['累積專業必修被當pic'].mean().reset_index(name='累積專業必修被當')
+dfpic4 = dfpic4.groupby(['學號','學年','學期','年級','是否被二一'])['累積專業必修被當'].mean().reset_index(name='累積專業必修被當')
 dfpic4['是否被二一'] = dfpic4['是否被二一'].astype(str)
 ```
-
-```{r}
-p1 <- ggplot(py$dfpic4, aes(x=年級, y=累積專業必修被當, fill=是否被二一)) + 
-    geom_boxplot(outlier.shape = NA)+labs(x='年級',y = "累積專業必修被當",size=10) +scale_fill_discrete(name="是否被二一")
-```
-
 ```{python 貼上累積共同必修特徵}
 dfcommon= df[(df['開課系所'] == '軍訓（必選修）')  | (df['名稱'] == '體育') |(df['科目名稱'] =='大一國文：經典閱讀與詮釋') |(df['科目名稱'] =='國文：經典閱讀與詮釋') | (df['科目名稱'] =='大學英文：英語聽講練習')  | (df['科目名稱'] =='大學英文') | (df['科目名稱'] =='英語聽講練習') | (df['科目名稱'] =='英文') | (df['科目名稱'] =='歷史')]
 dfcommon = dfcommon[(dfcommon['必選修類別（必／選／通）']=='必')]
@@ -379,21 +258,13 @@ df=pd.merge(df,dfcommong3,on = ['學號','學年','學期'],how='outer')
 df['累積共同必修被當比'] = df['累積共同必修被當'] / df['累積共同必修修課數']
 df = df.fillna(0)
 ```
-
 ```{python 共必圖}
 dfpic4_1 = df[df['修課幾學期'] >= 8]
 dfpic4_1['年級'] = dfpic4_1['系級'].str[-1] + dfpic4_1['學期'].astype(str)
 #print(dfclass1_1_1[dfclass1_1_1['學號']==410071464])
-dfpic4_1 = dfpic4_1.groupby(['學號','學年','學期','年級','是否被二一'])['累積共同必修被當pic'].mean().reset_index(name='累積共同必修被當')
+dfpic4_1 = dfpic4_1.groupby(['學號','學年','學期','年級','是否被二一'])['累積共同必修被當'].mean().reset_index(name='累積共同必修被當')
 dfpic4_1['是否被二一'] = dfpic4_1['是否被二一'].astype(str)
 ```
-
-```{r}
-p1_1 <- ggplot(py$dfpic4_1, aes(x=年級, y=累積共同必修被當, fill=是否被二一)) + 
-    geom_boxplot(outlier.shape = NA)+labs(x='年級',y = "累積共同必修被當",size=10) +scale_fill_discrete(name="是否被二一")
-```
-
-
 ```{python 貼上累積其他必修特徵}
 dfothers = df[(df['開課系所'] != '軍訓（必選修）') &(df['名稱'] != '體育') & (df['科目名稱'] !='大一國文：經典閱讀與詮釋') &(df['科目名稱'] !='國文：經典閱讀與詮釋') & (df['科目名稱'] !='大學英文：英語聽講練習')  & (df['科目名稱'] !='大學英文') & (df['科目名稱'] !='英語聽講練習') & (df['科目名稱'] !='英文') & (df['科目名稱'] !='歷史') ]
 dfothers = dfothers[(dfothers['必選修類別（必／選／通）']=='必')]
@@ -426,20 +297,13 @@ df=pd.merge(df,dfothersg3,on = ['學號','學年','學期'],how='outer')
 df['累積其他必修被當比'] = df['累積其他必修被當'] / df['累積其他必修修課數']
 df = df.fillna(0)
 ```
-
 ```{python 其他必圖}
 dfpic4_2 = df[df['修課幾學期'] >= 8]
 dfpic4_2['年級'] = dfpic4_2['系級'].str[-1] + dfpic4_2['學期'].astype(str)
 #print(dfclass1_1_1[dfclass1_1_1['學號']==410071464])
-dfpic4_2 = dfpic4_2.groupby(['學號','學年','學期','年級','是否被二一'])['累積其他必修被當pic'].mean().reset_index(name='累積其他必修被當')
+dfpic4_2 = dfpic4_2.groupby(['學號','學年','學期','年級','是否被二一'])['累積其他必修被當'].mean().reset_index(name='累積其他必修被當')
 dfpic4_2['是否被二一'] = dfpic4_2['是否被二一'].astype(str)
 ```
-
-```{r}
-p1_2 <- ggplot(py$dfpic4_2, aes(x=年級, y=累積其他必修被當, fill=是否被二一)) + 
-    geom_boxplot(outlier.shape = NA)+labs(x='年級',y = "累積其他必修被當",size=10) +scale_fill_discrete(name="是否被二一")
-```
-
 ```{python 計算選修中位數,eval=FALSE}
 #### 累計選修被當比
 #計算每人選修課數、 各班中位數
@@ -449,7 +313,6 @@ dfclass2 = dfclass2.groupby(['系別','入學年'])['個人選修數'].median().
 dfclass2=dfclass2[(dfclass2['入學年']=='100') |(dfclass2['入學年']=='101') | (dfclass2['入學年']=='102') |
 (dfclass2['入學年']=='103')]
 ```
-
 ```{python 貼上累計選修被當比特徵}
 #貼上特徵
 #選修不及格各學期狀況
@@ -474,23 +337,12 @@ dfclass2_1_3 = dfclass2_1_3.drop(['選修被當'],axis =1)
 dfclass2_1_3=dfclass2_1_3.fillna(0)
 df=pd.merge(df,dfclass2_1_3,on = ['學號','學年','學期'],how='outer')
 ```
-
 ```{python}
 dfpic5 = df[df['修課幾學期'] >= 8]
 dfpic5['年級'] = dfpic5['系級'].str[-1] + dfpic5['學期'].astype(str)
-dfpic5 = dfpic5.groupby(['學號','學年','學期','年級','是否被二一'])['累積選修被當pic'].mean().reset_index(name='累積選修被當')
+dfpic5 = dfpic5.groupby(['學號','學年','學期','年級','是否被二一'])['累積選修被當'].mean().reset_index(name='累積選修被當')
 dfpic5['是否被二一'] = dfpic5['是否被二一'].astype(str)
 ```
-
-```{r}
-p2 <- ggplot(py$dfpic5, aes(x=年級, y=累積選修被當, fill=是否被二一)) + geom_boxplot(outlier.shape = NA)+labs(x='年級',y = "累積選修被當",size=10) +scale_fill_discrete(name="是否被二一")
-```
-
-```{r eval=FALSE}
-py$dfclass2%>% DT::datatable()
-```
-
-
 ```{python 計算通識中位數 ＊＊有些達到8、9＊＊}
 #通識
 #計算每人通識課數、 各班中位數
@@ -500,7 +352,6 @@ dfclass3 = dfclass3.groupby(['系別','入學年'])['個人通識數'].median().
 dfclass3=dfclass3[(dfclass3['入學年']=='100') |(dfclass3['入學年']=='101') | (dfclass3['入學年']=='102') |
 (dfclass3['入學年']=='103')]
 ```
-
 ```{python 貼上累計通識被當比特徵}
 #貼上特徵
 dfclass3_1=df[df['必選修類別（必／選／通）'] == '通']
@@ -524,117 +375,12 @@ dfclass3_1_3 = dfclass3_1_3.drop(['通識被當'],axis =1)
 dfclass3_1_3=dfclass3_1_3.fillna(0)
 df=pd.merge(df,dfclass3_1_3,on = ['學號','學年','學期'],how='outer')
 ```
-
 ```{python}
 dfpic6 = df[df['修課幾學期'] >= 8]
 dfpic6['年級'] = dfpic6['系級'].str[-1]+dfpic6['學期'].astype(str)
-dfpic6 = dfpic6.groupby(['學號','學年','學期','年級','是否被二一'])['累積通識被當pic'].mean().reset_index(name='累積通識被當')
+dfpic6 = dfpic6.groupby(['學號','學年','學期','年級','是否被二一'])['累積通識被當'].mean().reset_index(name='累積通識被當')
 dfpic6['是否被二一'] = dfpic6['是否被二一'].astype(str)
 ```
-
-```{r}
-p3 <- ggplot(py$dfpic6, aes(x=年級, y=累積通識被當, fill=是否被二一)) + 
-    geom_boxplot(outlier.shape = NA)+labs(x='年級',y = "累積通識被當",size=10) +scale_fill_discrete(name="是否被二一")
-```
-
-```{r ,eval=FALSE}
-py$dfclass3%>% DT::datatable()
-#表發現有些班級通識課的中位數較高，可能跟該班的特質有關，為了不讓該特質影響結果，在此同用使用比例。
-```
-
-```{r}
-multiplot(p1,p2 ,cols=1)
-multiplot(p1_1,p1_2,p3,cols=1)
-```
-
-圖中被二一的人不管是累積專業必修被當、累積選修被當，都明顯高於沒被二一的人，在大四下的時候，觀察到各累積專業必修被當、累積選修被當的中位數均會下降，是因為延畢的關係；成績單在延畢後的第一學期會變成四上（其實是五上），延畢後越後面的學期學生越會減少自己被當的科目才能順利畢業，故五下的被當說會比五上少；導致四上累積被當中位數會比四下多，相較於累積專業必修被當與累積選修被當中位數；沒被二一同學的累計通識被當、累積其他必修被當與累積共同必修被當中位數皆為0，代表通識課程與共同必修相較於專業科目是比較不容易被當的，若此類型的科目出現被當可能反映了該位學生在學習上的不適應；而累積其他必修被當而被二一的學生類型很特別，代表此類的學生有想要更多的自我挑戰，所以可能修了教育學程等等，導致自己的必修課業繁重而被二一。
-
-
-<!--### 累計外系修課狀況
-定義外系課程為，去掉通識課與本系開設課程後，若該班中不到五成的同學修該門課則列入外系課程，班定義為同入學年且同系的同學，其中法律系的開課系所不分組統一為法律系。
-各系會因為畢業學分規定不同與本系所開設的選修課程多寡，導致外系修課數有所不同，所以在此我們將做標準化處理（減班平均處以班標準差）。
--->
-```{python 計算外系課程中位數,eval=FALSE}
-dfom=df[df['必選修類別（必／選／通）'] != '通']
-dfom = dfom[dfom['開課系所'] != '軍訓（必選修）']
-dfom = dfom[dfom['名稱'] != '體育']
-dfom = dfom[(dfom['科目名稱'] !='大一國文：經典閱讀與詮釋') &(dfom['科目名稱'] !='國文：經典閱讀與詮釋') & (dfom['科目名稱'] !='大學英文：英語聽講練習')  & (dfom['科目名稱'] !='大學英文') & (dfom['科目名稱'] !='英語聽講練習') & (dfom['科目名稱'] !='英文') & (dfom['科目名稱'] !='歷史')]
-#法律系開課系所統一
-dfom['開課系所'] = np.where(dfom['開課系所'].astype(str).str[0] == '法',dfom['開課系所'].str[:4],dfom['開課系所'])
-#非本科系開設
-dfom = dfom[dfom['開課系所'] != dfom['系別']]
-````
-```{python 製造累計外系修課狀況特徵1,eval=FALSE}
-#該課被該班（系別入學年=該班）修過幾次，用總資料算修課人物
-dftemp = df.groupby(['科目名稱','系別','入學年']).size().reset_index(name = '該課被該班修過幾次')
-dfom = pd.merge(dfom,dftemp,on=['科目名稱','系別','入學年'],how='inner')
-#<0.5算外系
-dfom['是否為外系課'] = np.where((dfom['該課被該班修過幾次']/dfom['該班人數']) < 0.5 , 1 , 0)
-#計算個人外系修課數
-dftemp = dfom.groupby(['系別','入學年','學號'])['是否為外系課'].sum().reset_index(name = '個人外系修課數')
-#並回去原df，na填0，因na一定是非外系課所造成
-df = pd.merge(df,dftemp,on=['系別','入學年','學號'],how='outer')
-df['個人外系修課數']=df['個人外系修課數'].fillna(0)
-#圖
-dfom1 = dfom[dfom['不及格'] != 1]
-dftemp1 = dfom1.groupby(['系別','入學年','學號'])['是否為外系課'].sum().reset_index(name = '個人外系修課數')
-dftemp1=dftemp1.groupby(['系別','入學年'])['個人外系修課數'].median().reset_index(name = '外系修課數')
-dftemp1 = dftemp1[(dftemp1['入學年'] == '100') |(dftemp1['入學年'] == '101')|(dftemp1['入學年'] == '102')|(dftemp1['入學年'] == '103')]
-```
-```{python 製造累計外系修課狀況特徵2,eval=FALSE}
-#貼上特徵
-#各學期班上的外系修課平均
-dfmean = df.groupby(['系級','學年','學期','學號'])['個人外系修課數'].mean().reset_index()
-dfmean = dfmean.groupby(['系級','學年','學期'])['個人外系修課數'].mean().reset_index(name='班平均')
-#各學期班上的外系修課標準差
-dfstd = df.groupby(['系級','學年','學期','學號'])['個人外系修課數'].mean().reset_index()
-dfstd = dfstd.groupby(['系級','學年','學期'])['個人外系修課數'].std().reset_index(name = '班標準差')
-
-df = pd.merge(df,dfmean,on=['系級','學年','學期'],how='outer')
-df = pd.merge(df,dfstd,on=['系級','學年','學期'],how='outer')
-#na值為標準差(為107年的資料可以略過)
-df['外系標準化修課數'] = (df['個人外系修課數'] - df['班平均']) / df['班標準差']
-dfa=df.groupby(['學號','學年','學期'])['外系標準化修課數'].mean().reset_index()
-dfa['累計外系修課指標'] = dfa.groupby(['學號'])['外系標準化修課數'].apply(lambda x: x.cumsum().shift())
-
-dfa['累計外系修課指標pic'] = dfa.groupby(['學號'])['外系標準化修課數'].apply(lambda x: x.cumsum())
-dfa = dfa.fillna(0)
-dfa = dfa.drop(['外系標準化修課數'],axis =1)
-df = pd.merge(df,dfa,on=['學號','學年','學期'],how='outer')
-```
-```{python,eval=FALSE}
-dfpic7 = df[df['修課幾學期'] >= 8]
-dfpic7['年級'] = dfpic7['系級'].str[-1]+dfpic7['學期'].astype(str)
-dfpic7 = dfpic7.groupby(['學號','學年','學期','年級','是否被二一'])['累計外系修課指標pic'].mean().reset_index(name='累計外系修課指標')
-dfpic7['是否被二一'] = dfpic7['是否被二一'].astype(str)
-```
-```{r ,warning=FALSE,eval=FALSE}
-ggplot(py$dfpic7, aes(x=年級, y=累計外系修課指標, fill=是否被二一)) + 
-    geom_boxplot( outlier.shape = NA) + ylim(-1,1)+labs(x='年級',y = "累計外系修課指標",size=10) +scale_fill_discrete(name="是否被二一")
-```
-```{r,eval=FALSE}
-py$dftemp1 %>% DT::datatable()
-#因為要做標準差比較時會有延畢生在延畢學期無法跟同入學年的同學做標準化，故在建構特徵時，將以同系且同時期修課的同學定義做班標準化。
-```
-
-
-
-### 必修/選修/通識成績表現
-
-上節特徵討論了必選修以及通識課的被當狀況，在此進一步討論成績對於二一所帶來的影響，成績衡量將以臺北大學GPA計算方式衡量，定義如下：
-
-成績衡量方式：GPA＝GPA加權總和÷總學分數。
-
-成績 | GPA成績
----------|---------
-80 ~100  | 4
-70 ~  79 | 3
-60 ~  69 | 2
-50 ~  59 | 1
-低於 50  | 0
-
-運用此GPA與同年級且同入學年的同學進行排名比較，觀察成績排名的影響。
-
 ```{python}
 def a(row):
 	if 50<=row['學期成績']<60:
@@ -656,8 +402,6 @@ def oo(x) :
   else:
     return int(x/10)/100
 ```
-
-
 ```{python 製作專業必修成績表現}
 df25 = df[df['是否為專業必修'] == 1]
 df25['GPA成績'] = df25.apply(a,axis=1)
@@ -686,7 +430,6 @@ df =df.assign(prcommon1_1=df.groupby(['系別','年級','入學年'])['年級GPA
 df =df.assign(prcommonpic1_2=df.groupby(['系別','年級','入學年'])['年級GPApic專業必'].rank(pct=True).mul(100))
 df = df.drop(['GPA專業必', 'GPApic專業必', '年級GPA專業必', '年級GPApic專業必'],axis=1)
 ```
-
 ```{python 製作共同必修成績表現}
 df251= df[(df['開課系所'] == '軍訓（必選修）')  | (df['名稱'] == '體育') |(df['科目名稱'] =='大一國文：經典閱讀與詮釋') |(df['科目名稱'] =='國文：經典閱讀與詮釋') | (df['科目名稱'] =='大學英文：英語聽講練習')  | (df['科目名稱'] =='大學英文') | (df['科目名稱'] =='英語聽講練習') | (df['科目名稱'] =='英文') | (df['科目名稱'] =='歷史')]
 df251 = df251[(df251['必選修類別（必／選／通）']=='必')]
@@ -716,7 +459,6 @@ df =df.assign(prcommon2_1=df.groupby(['系別','年級','入學年'])['年級GPA
 df =df.assign(prcommonpic2_2=df.groupby(['系別','年級','入學年'])['年級GPApic共同必'].rank(pct=True).mul(100))
 df = df.drop(['GPA共同必', 'GPApic共同必', '年級GPA共同必', '年級GPApic共同必'],axis=1)
 ```
-
 ```{python 製作其他必修成績表現}
 df252 = df[(df['開課系所'] != '軍訓（必選修）') &(df['名稱'] != '體育') & (df['科目名稱'] !='大一國文：經典閱讀與詮釋') &(df['科目名稱'] !='國文：經典閱讀與詮釋') & (df['科目名稱'] !='大學英文：英語聽講練習')  & (df['科目名稱'] !='大學英文') & (df['科目名稱'] !='英語聽講練習') & (df['科目名稱'] !='英文') & (df['科目名稱'] !='歷史') ]
 df252 = df252[(df252['必選修類別（必／選／通）']=='必')]
@@ -747,7 +489,6 @@ df =df.assign(prcommon3_1=df.groupby(['系別','年級','入學年'])['年級GPA
 df =df.assign(prcommonpic3_2=df.groupby(['系別','年級','入學年'])['年級GPApic其他必'].rank(pct=True).mul(100))
 df = df.drop(['GPA其他必', 'GPApic其他必', '年級GPA其他必', '年級GPApic其他必'],axis=1)
 ```
-
 ```{python 製作選修成績表現}
 df253=df[df['必選修類別（必／選／通）'] == '選']
 df253['GPA成績'] = df253.apply(a,axis=1)
@@ -776,7 +517,6 @@ df =df.assign(prselect=df.groupby(['系別','年級','入學年'])['年級GPA選
 df =df.assign(prselect2=df.groupby(['系別','年級','入學年'])['年級GPApic選'].rank(pct=True).mul(100))
 df = df.drop(['GPA選', 'GPApic選', '年級GPA選', '年級GPApic選'],axis=1)
 ```
-
 ```{python 製作通識成績表現}
 df254=df[df['必選修類別（必／選／通）'] == '通']
 df254['GPA成績'] = df254.apply(a,axis=1)
@@ -805,69 +545,33 @@ df =df.assign(prgernal=df.groupby(['系別','年級','入學年'])['年級GPA通
 df =df.assign(prgernal2=df.groupby(['系別','年級','入學年'])['年級GPApic通'].rank(pct=True).mul(100))
 df = df.drop(['GPA通', 'GPApic通', '年級GPA通', '年級GPApic通'],axis=1)
 ```
-
 ```{python}
 #專業必
 dfpic8_1 = df[df['修課幾學期'] >= 8]
 dfpic8_1['年級'] = dfpic8_1['系級'].str[-1]+ dfpic8_1['學期'].astype(str)
-dfpic8_1 = dfpic8_1.groupby(['學號','學年','學期','年級','是否被二一'])['prcommonpic1_2'].mean().reset_index(name='pr')
+dfpic8_1 = dfpic8_1.groupby(['學號','學年','學期','年級','是否被二一'])['prcommon1_1'].mean().reset_index(name='pr')
 dfpic8_1['是否被二一'] = dfpic8_1['是否被二一'].astype(str)
 #共同必
 dfpic8_2 = df[df['修課幾學期'] >= 8]
 dfpic8_2['年級'] = dfpic8_2['系級'].str[-1]+ dfpic8_2['學期'].astype(str)
-dfpic8_2 = dfpic8_2.groupby(['學號','學年','學期','年級','是否被二一'])['prcommonpic2_2'].mean().reset_index(name='pr')
+dfpic8_2 = dfpic8_2.groupby(['學號','學年','學期','年級','是否被二一'])['prcommon2_1'].mean().reset_index(name='pr')
 dfpic8_2['是否被二一'] = dfpic8_2['是否被二一'].astype(str)
 #其他必
 dfpic8_3 = df[df['修課幾學期'] >= 8]
 dfpic8_3['年級'] = dfpic8_3['系級'].str[-1]+ dfpic8_3['學期'].astype(str)
-dfpic8_3 = dfpic8_3.groupby(['學號','學年','學期','年級','是否被二一'])['prcommonpic3_2'].mean().reset_index(name='pr')
+dfpic8_3 = dfpic8_3.groupby(['學號','學年','學期','年級','是否被二一'])['prcommon3_1'].mean().reset_index(name='pr')
 dfpic8_3['是否被二一'] = dfpic8_3['是否被二一'].astype(str)
 #選
 dfpic8_4 = df[df['修課幾學期'] >= 8]
 dfpic8_4['年級'] = dfpic8_4['系級'].str[-1]+ dfpic8_4['學期'].astype(str)
-dfpic8_4 = dfpic8_4.groupby(['學號','學年','學期','年級','是否被二一'])['prselect2'].mean().reset_index(name='pr')
+dfpic8_4 = dfpic8_4.groupby(['學號','學年','學期','年級','是否被二一'])['prselect'].mean().reset_index(name='pr')
 dfpic8_4['是否被二一'] = dfpic8_4['是否被二一'].astype(str)
 #通
 dfpic8_5 = df[df['修課幾學期'] >= 8]
 dfpic8_5['年級'] = dfpic8_5['系級'].str[-1]+ dfpic8_5['學期'].astype(str)
-dfpic8_5 = dfpic8_5.groupby(['學號','學年','學期','年級','是否被二一'])['prgernal2'].mean().reset_index(name='pr')
+dfpic8_5 = dfpic8_5.groupby(['學號','學年','學期','年級','是否被二一'])['prgernal'].mean().reset_index(name='pr')
 dfpic8_5['是否被二一'] = dfpic8_5['是否被二一'].astype(str)
 ```
-
-```{r ,warning=FALSE}
-p1 <- ggplot(py$dfpic8_1, aes(x=年級, y=pr, fill=是否被二一)) + 
-    geom_boxplot( outlier.shape = NA) + 
-    labs(x='年級',y = "累積專業必修pr",size=10) + 
-    scale_fill_discrete(name="是否被二一")
-p2 <- ggplot(py$dfpic8_2, aes(x=年級, y=pr, fill=是否被二一)) + 
-    geom_boxplot( outlier.shape = NA)+ 
-    labs(x='年級',y = "累積共同必修pr",size=10)  + 
-    scale_fill_discrete(name="是否被二一")
-p3 <- ggplot(py$dfpic8_3, aes(x=年級, y=pr, fill=是否被二一)) + 
-    geom_boxplot( outlier.shape = NA)+ 
-    labs(x='年級',y = "累積其他必修pr",size=10)  + 
-    scale_fill_discrete(name="是否被二一")
-p4 <- ggplot(py$dfpic8_4, aes(x=年級, y=pr, fill=是否被二一)) + 
-    geom_boxplot( outlier.shape = NA)+ 
-    labs(x='年級',y = "累積選修pr",size=10) + 
-    scale_fill_discrete(name="是否被二一") 
-p5 <- ggplot(py$dfpic8_5, aes(x=年級, y=pr, fill=是否被二一)) + 
-    geom_boxplot( outlier.shape = NA)+ 
-    labs(x='年級',y = "累積通識pr",size=10)  + 
-    scale_fill_discrete(name="是否被二一")
-
-multiplot(p1, p2,p3 ,cols=1)
-multiplot(p4,p5 ,cols=1)
-```
-
-前三張圖為各類型必修之pr表現，明顯的看到在成績表現上面與各類必修被當比反應的狀況大致相同；被二一同學類的同學在於成績表現方面確實是明顯輸給沒被二一類型，特別注意在最後一項累積其他必修pr，在大一時因為兩類型的學生不太可能修太多非本系以外的必修，故pr中位數會差不多，後兩張圖也是明顯區隔了兩類型的學生。
-
-
-## 同儕面向
-### 同儕影響力
-
-被二一的同學很多時候不僅是學習上遇到問題一部分的原因也是對於校園生活的不適應；或是同儕的影響，下圖為藉由大學四年來與自己修課重疊度最高的同學在成績上的關聯圖，可以看出修課面向的特徵受到同儕的影響皆為正相關，為了能夠捕捉同儕面向的特徵，將引入下小節的特徵。
-
 ```{python 同儕影響力 }
 #====完整103~====
 dfk = df[(df['入學年']=='100') | (df['入學年']=='101') | (df['入學年']=='102') | (df['入學年']=='103')]
@@ -904,7 +608,6 @@ dftest=dftest.drop(['學號_y'],axis=1)
 dftest.columns = ['學號','好友']
 df103 = pd.merge(df103,dftest,on=['學號'])
 ```
-
 ```{python }
 df103_1 = df103[['好友']]
 df103_1.rename(columns={'好友':'學號'}, inplace=True)
@@ -914,7 +617,6 @@ df103_3.rename(columns={'學號':'好友','累積專業必修被當比':'f累積
 df103_3 = df103_3.groupby(['好友'])['f累積專業必修被當比','f累積共同必修被當比','f累積其他必修被當比','f累積選修被當比','f累積通識被當比','fprcommon1_1','fprcommon2_1','fprcommon3_1','fprselect','fprgernal'].mean().reset_index()
 df103 = pd.merge(df103,df103_3,on='好友')
 ```
-
 ```{python}
 dfpic10 = df103[df103['修課幾學期'] >= 8]
 dfpic10['年級'] = dfpic10['系級'].str[-1]
@@ -959,59 +661,6 @@ dfpic10_10 = dfpic10.groupby(['學號','學年','學期','年級','是否被二�
 dfpic10_10['是否被二一'] = dfpic10_10['是否被二一'].astype(str)
 dfpic10_10 = dfpic10_10[(dfpic10_10['年級']!='1')]
 ```
-
-```{r results='asis',message=FALSE}
-p1 <- ggplot(py$dfpic10_1, aes(x=f累積專業必修被當比, y=累積專業必修被當比, color=年級)) + 
-    geom_point(size=2, alpha=0.8)+labs(x='f累積專業必修被當比',y = "累積專業必修被當比",size=10) +scale_fill_discrete(name="年級") + scale_colour_manual(name = "年級",values = c("skyblue", "skyblue", "green",'pink','red'))+
-  geom_smooth(method = "lm", color="red", linetype=2)
-
-p2 <- ggplot(py$dfpic10_2, aes(x=f累積共同必修被當比, y=累積共同必修被當比, color=年級)) + 
-   geom_point(size=2, alpha=0.8)+labs(x='f累積共同必修被當比',y = "累積共同必修被當比",size=10) +scale_fill_discrete(name="年級") +scale_fill_discrete(name="年級") + scale_colour_manual(name = "年級",values = c("skyblue", "green",'pink','yellow'))+
-  geom_smooth(method = "lm", color="red", linetype=2)
-
-p3 <- ggplot(py$dfpic10_3, aes(x=f累積其他必修被當比, y=累積其他必修被當比, color=年級)) + 
- geom_point(size=2, alpha=0.8)+labs(x='f累積其他必修被當比',y = "累積其他必修被當比",size=10) +scale_fill_discrete(name="年級")+scale_fill_discrete(name="年級") + scale_colour_manual(name = "年級",values = c("skyblue", "green",'pink','yellow'))+ geom_smooth(method = "lm", color="red", linetype=2)
-
-p4 <- ggplot(py$dfpic10_4, aes(x=fprcommon1_1, y=prcommon1_1, color=年級)) + 
-    geom_point(size=2, alpha=0.8)+labs(x='f專業必修pr',y = "專業必修pr",size=10) +scale_fill_discrete(name="年級")+scale_fill_discrete(name="年級") + scale_colour_manual(name = "年級",values = c("skyblue", "green",'pink','yellow'))+
-  geom_smooth(method = "lm", color="red", linetype=2)
-
-p5 <- ggplot(py$dfpic10_5, aes(x=fprcommon2_1, y=prcommon2_1, color=年級)) + 
-    geom_point(size=2, alpha=0.8)+labs(x='f共同必修pr',y = "共同必修pr",size=10) +scale_fill_discrete(name="年級")+scale_fill_discrete(name="年級") + scale_colour_manual(name = "年級",values = c("skyblue", "green",'pink','yellow'))+
-  geom_smooth(method = "lm", color="red", linetype=2)
-
-p6 <- ggplot(py$dfpic10_6, aes(x=fprcommon3_1, y=prcommon3_1, color=年級)) + 
-    geom_point(size=2, alpha=0.8)+labs(x='f其他必修pr',y = "其他必修pr",size=10) +scale_fill_discrete(name="年級")+scale_fill_discrete(name="年級") + scale_colour_manual(name = "年級",values = c("skyblue", "green",'pink','yellow'))+
-  geom_smooth(method = "lm", color="red", linetype=2)
-
-p7 <- ggplot(py$dfpic10_7, aes(x=fprselect, y=prselect, color=年級)) + 
-    geom_point(size=2, alpha=0.8)+labs(x='f選修pr',y = "選修pr",size=10) +scale_fill_discrete(name="年級")+scale_fill_discrete(name="年級") + scale_colour_manual(name = "年級",values = c("skyblue", "green",'pink','yellow'))+
-  geom_smooth(method = "lm", color="red", linetype=2)
-
-p8 <- ggplot(py$dfpic10_8, aes(x=fprgernal, y=prgernal, color=年級)) + 
-    geom_point(size=2, alpha=0.8)+labs(x='f通識pr',y = "通識pr",size=10) +scale_fill_discrete(name="年級")+scale_fill_discrete(name="年級") + scale_colour_manual(name = "年級",values = c("skyblue", "green",'pink','yellow'))+
-  geom_smooth(method = "lm", color="red", linetype=2)
-
-p9 <- ggplot(py$dfpic10_9, aes(x=f累積選修被當比, y=累積選修被當比, color=年級)) + 
-    geom_point(size=2, alpha=0.8)+labs(x='f累積選修被當比',y = "累積選修被當比",size=10) +scale_fill_discrete(name="年級")+scale_fill_discrete(name="年級") + scale_colour_manual(name = "年級",values = c("skyblue", "green",'pink','yellow'))+
-  geom_smooth(method = "lm", color="red", linetype=2)
-
-p10 <- ggplot(py$dfpic10_10, aes(x=f累積通識被當比, y=累積通識被當比, color=年級)) + 
-    geom_point(size=2, alpha=0.8)+labs(x='f累積通識被當比',y = "累積通識被當比",size=10) +scale_fill_discrete(name="年級")+scale_fill_discrete(name="年級") + scale_colour_manual(name = "年級",values = c("skyblue", "green",'pink','yellow'))+
-  geom_smooth(method = "lm", color="red", linetype=2)
-
-multiplot(p1,p2,p3 ,cols=1)
-multiplot(p9,p10 ,cols=1)
-multiplot(p4,p5,p6 ,cols=1)
-multiplot(p7,p8 ,cols=1)
-```
-
-### 累積群聚指標
-
-
-累積群聚指標是衡量學生在累積至該學期時在課堂之中會見到多少同班同學，因各班的修課數不同、畢業學分也不同；班定義為同系且同入學年者，故會分別以各班平均以及標準差，標準化此指標，圖顯示隨著年級的上升兩類型學生的差異會越來越大，主因為被二一的學生到後期必須去補足以前被當的科目而將導致與同班同學的課脫節，進而影響此特徵。
-
-
 ```{python 累計群聚指標特徵1}
 #同班定義為同系級且同學年學期修課者。
 #同班不用入學年與系別定義的原因為，解決較晚入學者若同學們都畢業後會造成沒有班標準差的問題。
@@ -1025,15 +674,10 @@ df26_1['累積群聚指標'] = df26_1.groupby(['學號'])['群聚指標'].apply(
 #df26_1 = df26_1.drop(['學期中遇到多少同班的人'],axis=1)
 df = pd.merge(df,df26_1,on = ['學號','學年','學期'],how ='outer')
 ```
-
 ```{python 製圖}
 df27 = df.groupby(['學號','系別','入學年'])['累積群聚指標'].max().reset_index()
 df27 = df27.groupby(['系別','入學年'])['累積群聚指標'].median().reset_index(name = '在校最後一年累積群聚中位數')
 #df27['累計群聚指標中位數'] = df27['累計群聚指標中位數'].astype(int)
-```
-```{r}
-#py$df27 %>% DT::datatable()
-#由表可觀察出各系的群聚指標會因為各系課程上的差異而有所差異，所以我們再將群聚指標做標準化（減去同班的平均再除以班上的標準差），作為解釋變數。
 ```
 ```{python 累計群聚指標2}
 #各學期班上的群聚指標平均
@@ -1048,37 +692,17 @@ dfdd['標準化群聚指標'] = (dfdd['群聚指標'] - dfdd['班群聚平均數
 dfdd['標準化群聚指標']=dfdd['標準化群聚指標'].fillna(0)
 df30=dfdd.groupby(['學號','學年','學期'])['標準化群聚指標'].mean().reset_index()
 df30['累積標準化群聚指標'] = df30.groupby(['學號'])['標準化群聚指標'].apply(lambda x: x.cumsum().shift())
-
 df30['累積標準化群聚指標pic'] = df30.groupby(['學號'])['標準化群聚指標'].apply(lambda x: x.cumsum())
 df30 =df30.fillna(0)
 #df30 = df30.drop(['標準化群聚指標'],axis=1)
 df = pd.merge(df,df30,on=['學號','學年','學期'],how='outer')
 ```
-
 ```{python}
 dfpic9 = df[df['修課幾學期'] >= 8]
 dfpic9['年級'] = dfpic9['系級'].str[-1] + dfpic9['學期'].astype(str)
 dfpic9 = dfpic9.groupby(['學號','學年','學期','年級','是否被二一'])['累積標準化群聚指標pic'].mean().reset_index(name='累積標準化群聚指標')
 dfpic9['是否被二一'] = dfpic9['是否被二一'].astype(str)
 ```
-
-```{r results='asis',message=FALSE}
-#ggplot(py$dfpic9, aes(x =累計標準化群聚指標, y=年級, fill = 是否被二一)) + geom_density_ridges(alpha=0.55) +labs(x='累計標準化群聚指標',y = "年級",size=10) +scale_fill_discrete(name="是否被二一")
-#二上開始可以明顯看到，被二一的學生們群聚指標往負的越來越多，造成的原因為他們開始回頭去修被當的科目，而此時班上的同學不會修該門課。
-```
-
-
-```{r results='asis',warning=FALSE}
-ggplot(py$dfpic9, aes(x=年級 , y=累積標準化群聚指標, fill = 是否被二一)) + 
-    geom_boxplot( outlier.shape = NA)
-```
-
-## 欲預測學期面向
-
-### 欲預測學期課業衡量
-
-此處主要是以抓出欲預測學期的特徵為主，在學期尚未開始前我們從成績單上能得知關於該學期特徵資訊僅有該學期必修數、選修數、通識數此類修課狀況特徵，在此必修課與前幾小節不一樣僅拆成兩類；專業與其他必修以及共同必修，僅拆成兩類原因為，其他必修類課程通常為輔系與雙主修者會有的必修類型，此類與專業必修課的課中繁重程度上是相同的，為了能夠有效衡量學生在該學期修課的繁重程度，衡量方式為衡量學生在該學期中修了多少自己系上專業必修的比例，專業與其他必修衡量特徵是以該學期專業與其他必修修課數除以各系專業必修數；共同必修衡量特徵是以共同必修修課數除以4，除以4的原因為全校共同必修僅有四種分別為國文、英文、英聽、歷史四門課，通識類課程衡量方式講以該學期通識修課數除以六，統一除以六原因為學校規定最低為修滿六門通識課，選修類型課程衡量則以該學期選修課數除以各班的選修中位數。
-
 ```{python 欲預測學期專業必修衡量特徵}
 a=[]
 dfname = df.groupby(['系別']).size().reset_index()
@@ -1111,11 +735,9 @@ df=pd.merge(df,b2,on = ['系別','入學年'],how='outer')
 df['該學期專業與其他必修修課比例'] = (df['當學期專業必修修課數'] + df['當學期其他必修修課數'])/df['系必修數']
 df=pd.merge(df103,df,how='inner')
 ```
-
 ```{python 欲預測學期共同必修衡量特徵}
 df['該學期共同必修修課比例'] = df['當學期共同必修修課數']/5
 ```
-
 ```{python 欲預測學期選修衡量特徵}
 #計算每人選修課數、 各班中位數
 dfclass2 = df[(df['必選修類別（必／選／通）'] == '選') & (df['不及格'] != 1)]
@@ -1125,12 +747,9 @@ df = pd.merge(df,dfclass2,on=['系別','入學年'],how='outer')
 
 df['該學期選修修課比例'] = df['當學期選修修課數']/df['班選修中位數']
 ```
-
 ```{python 欲預測學期通識衡量特徵}
 df['該學期通識修課比例'] = df['當學期通識修課數']/6
 ```
-
-
 ```{python}
 dfpic11 = df[df['修課幾學期'] >= 8]
 dfpic11['年級'] = dfpic11['系級'].str[-1] + dfpic11['學期'].astype(str)
@@ -1153,19 +772,6 @@ dfpic14 = dfpic14.groupby(['學號','學年','學期','年級','是否被二一'
 dfpic14['是否被二一'] = dfpic14['是否被二一'].astype(str)
 
 ```
-
-
-```{r results='asis',warning=FALSE}
-p1 <- ggplot(py$dfpic11, aes(x=年級, y=該學期專業與其他必修修課比例, fill=是否被二一))+ geom_boxplot( outlier.shape = NA) + ylim(0,1)+labs(x='年級',y = "該學期專業與其他必修修課比例",size=10) +scale_fill_discrete(name="是否被二一")
-p2 <- ggplot(py$dfpic12, aes(x=年級, y=該學期選修修課比例, fill=是否被二一))+ geom_boxplot( outlier.shape = NA) + ylim(0,1)+labs(x='年級',y = "該學期選修修課比例標",size=10) +scale_fill_discrete(name="是否被二一")
-p3 <- ggplot(py$dfpic13, aes(x=年級, y=該學期通識修課比例, fill=是否被二一))+ geom_boxplot( outlier.shape = NA) + ylim(0,1)+labs(x='年級',y = "該學期通識修課比例標",size=10) +scale_fill_discrete(name="是否被二一")
-p4 <- ggplot(py$dfpic14, aes(x=年級, y=該學期共同必修修課比例, fill=是否被二一))+ geom_boxplot( outlier.shape = NA) + ylim(0,1)+labs(x='年級',y = "該學期共同必修修課比例",size=10) +scale_fill_discrete(name="是否被二一")
-
-multiplot(p1,p2,p3,p4,cols=2)
-```
-
-# 各變數間的相關
-
 ```{python}
 df['年級'] = df['系級'].str[-1].astype(str) + df['學期'].astype(str)
 dfpic9 = df[df['修課幾學期'] >= 8]
@@ -1174,7 +780,7 @@ dfpic9_1=dfpic9.drop_duplicates()
 dfpic9_2=dfpic9_1.groupby(['學號','學年','學期']).size().reset_index(name='temp')
 dfpic9_2=dfpic9_2.drop(['temp'],axis=1)
 dfpn=pd.merge(dfpic9_2,dfpic9_1,on=['學號','學年','學期'],how='outer')
-dfpn = dfpn[['學號','學年','學期','年級','是否被二一','累積標準化群聚指標','累積通識被當比','累積選修被當比','累積專業必修被當比','累積共同必修被當比','累積其他必修被當比','該學期專業與其他必修修課比例','該學期選修修課比例','該學期通識修課比例','prcommon1_1','prcommon2_1','prcommon3_1','prselect','prgernal','累積二一','該學期共同必修修課比例']]
+dfpn = dfpn[['學號','學年','學期','年級','是否被二一','標準化群聚指標','累積標準化群聚指標','累積通識被當比','累積選修被當比','累積專業必修被當比','累積共同必修被當比','累積其他必修被當比','該學期專業與其他必修修課比例','該學期選修修課比例','該學期通識修課比例','prcommon1_1','prcommon2_1','prcommon3_1','prselect','prgernal','累積二一','該學期共同必修修課比例']]
 dfpn=dfpn.drop_duplicates()
 dfpn = dfpn.drop(['學號','學年','學期'],axis=1)
 dfpn = dfpn[dfpn['年級'] != '11']
@@ -1186,147 +792,822 @@ dfpn['是否被二一'] = dfpn['是否被二一'].astype(int)
 dfpn['年級'] = dfpn['年級'].astype(str)
 dfpn['是否被二一'] = dfpn['是否被二一'].astype(str)
 ```
-
 ```{python}
 #pic2 GPApic沒有
 df['年級'] = df['系級'].str[-1].astype(str) + df['學期'].astype(str)
 df['年級'] = df['年級'].astype(int)
-dfpic99 = df[['年級','是否被二一','累積標準化群聚指標','累積通識被當比','累積選修被當比','累積專業必修被當比','累積共同必修被當比','累積其他必修被當比','該學期專業與其他必修修課比例','該學期選修修課比例','該學期通識修課比例','該學期共同必修修課比例','prcommon1_1','prcommon2_1','prcommon3_1','prselect','prgernal','累積二一']]
+dfpic99 = df[['年級','是否被二一','累積標準化群聚指標','標準化群聚指標','累積通識被當比','累積選修被當比','累積專業必修被當比','累積共同必修被當比','累積其他必修被當比','該學期專業與其他必修修課比例','該學期選修修課比例','該學期通識修課比例','該學期共同必修修課比例','prcommon1_1','prcommon2_1','prcommon3_1','prselect','prgernal','累積二一']]
 #dfpic99.rename(columns={'累計標準化群聚指標pic':'累計標準化群聚指標','累計外系修課指標pic':'累計外系修課指標','GPApic':'GPA'}, inplace=True)
 ```
-```{r results='asis',message=FALSE}
-#ggcorr(py$dfpic9_2,geom="circle", size = 2,,method = c("everything", "pearson"))
-
-ggcorr(py$dfpic99,geom="circle", size = 2,,method = c("everything", "pearson"))
-```
-
--  年級跟好友的累積必修被當比為負相關，年級越高好友的累積必修被當比越低。
-
--  GPA 跟累積必/選/通被當比為負相關。
-
--  GPA與累計標準化群聚指標為正相關。
-
--  GPA年級正相關
-
-
-# 模型設計
-
-X修課面相特徵、Z同儕面相特徵、W欲預測學期課特徵
-是否會被二一的Y變數是反映了學生在學適應狀況Y*，如下：
-
-$$
-\begin{array}{lcl}
-Y_{i}^*&=&\beta_0+\beta_1 X_{i}+\beta_2 Z_{i}+\beta_3 W_{i}+\epsilon_{i}\\
-Y_{i}&=&I(Y_{i}^*>0),
-\end{array}
-$$
-
-其中Y=1代表本學期會21，Y=0代表不會。假設$\epsilon$ CDF為logistic, 則：
-
-CDF: logistic
-
-$$
-\Pr(Y=1|feature, X)=\frac{exp(X\beta)}{1+exp(X\beta)} 
-$$
-
-## Logistic Regression
-
 ```{python}
-dfpn1 = dfpn.copy()
-dfpn1['是否被二一'] = np.where(dfpn1['是否被二一'] =='1','yes','no')
-dfpn1['weight'] = np.where(dfpn1['是否被二一']=='yes',10,1)
+#weight 10
+#dfpn1 = dfpn.copy()
+#dfpn1['是否被二一'] = np.where(dfpn1['是否被二一'] =='1','yes','no')
+#dfpn1['weight'] = np.where(dfpn1['是否被二一']=='yes',10,1)
 
+#weight資料比
 dfpn2 = dfpn.copy()
 dfpn2['是否被二一'] = np.where(dfpn2['是否被二一'] =='1','yes','no')
-dfpn2['weight'] = np.where(dfpn2['是否被二一']=='yes',35717/397,1)
+dfpn2['weight'] = np.where(dfpn2['是否被二一']=='yes',35319/398,1)
+
 ```
-
 ```{r}
-rdf1 <- py$dfpn1
-rdf1$是否被二一 <- as.factor(rdf1$是否被二一)
-
+#weight 10
+#rdf1 <- py$dfpn
+#rdf1$是否被二一 <- as.factor(rdf1$是否被二一)
+#weight資料比
 rdf2 <- py$dfpn2
 rdf2$是否被二一 <- as.factor(rdf2$是否被二一)
 ```
-
-```{r,results=TRUE}
-
-trainIndices = createDataPartition(rdf1$是否被二一, p=.8, list=F)
-train1_1 <- rdf1[trainIndices,] %>% select(-weight)
-train1_2 <- rdf1[trainIndices,]
-test1_1 <- rdf1[-trainIndices,]
-good_observed1_1 =test1_1$是否被二一
-
-
+```{r}
+#rdf1$年級<-as.factor(rdf1$年級)
+rdf2$年級<-as.factor(rdf2$年級)
+#no weight
+set.seed(123)
 trainIndices = createDataPartition(rdf2$是否被二一, p=.8, list=F)
-train2_1 <- rdf2[trainIndices,] %>% select(-weight)
+train1_1 <- rdf2[trainIndices,] %>% dplyr::select(-weight)
+test1_1 <- rdf2[-trainIndices,] %>% dplyr::select(-weight)
+good_observed1_1 =test1_1$是否被二一
+#weight資料比
+train2_1 <- rdf2[trainIndices,] %>%  dplyr::select(-weight)
 train2_2 <- rdf2[trainIndices,]
-test2_1 <- rdf2[-trainIndices,]
+test2_1 <- rdf2[-trainIndices,] %>%  dplyr::select(-weight)
 good_observed2_1 =test2_1$是否被二一
-
+#smote人工建造資料https://zhuanlan.zhihu.com/p/24826792
+train3_1 <- rdf2[trainIndices,] %>%  dplyr::select(-weight)
+test3_1 <- rdf2[-trainIndices,] %>%  dplyr::select(-weight)
+good_observed3_1 =test3_1$是否被二一
+train3_1$年級<-as.factor(train3_1$年級)
+mysmote <- SMOTE(是否被二一~., train3_1,perc.over =100,perc.under = 200,k=5)
+##table(mysmote $是否被二一)
+#過採樣、欠採樣、雙採樣https://blog.csdn.net/qq_34139222/article/details/57461398
+train4_1 <- rdf2[trainIndices,] %>%  dplyr::select(-weight)
+test4_1 <- rdf2[-trainIndices,] %>%  dplyr::select(-weight)
+good_observed4_1 =test4_1$是否被二一
+train4_1$年級<-as.factor(train4_1$年級)
+myover <- ovun.sample(是否被二一~., data = train4_1, method = "over",N = 56512)$data#28256*2
+myunder <- ovun.sample(是否被二一~., data = train4_1, method = "under", N = 638, seed = 2)$data#319*2
+myboth <- ovun.sample(是否被二一~., data = train4_1, method = "both", p=0.5, N=28575, seed = 1)$data#兩者加起來的樣本數
 ctrl <- trainControl(method="cv", 
                      summaryFunction=twoClassSummary, 
                      classProbs=T,
                      savePredictions = T,
                      number = 10)
 ```
-```{r results='asis'}
+```{r,results='asis',warning=FALSE,message=FALSE}
 results1 = train(是否被二一~., 
                      data=train1_1, 
                      trControl = ctrl,
                      method='glm',
                      family=binomial(),
-                     weights = train1_2$weight)
+                     metric = "ROC")
 
 results2 = train(是否被二一~., 
                      data=train2_1, 
                      trControl = ctrl,
                      method='glm',
                      family=binomial(),
-                     weights = train2_2$weight)
+                     weights = train2_2$weight,
+                     metric = "ROC")
 
+results3 = train(是否被二一~., 
+                     data=mysmote, 
+                     trControl = ctrl,
+                     method='glm',
+                     metric = "ROC",
+                     family=binomial())
 
+results4 = train(是否被二一~., 
+                     data=myover, 
+                     trControl = ctrl,
+                     method='glm',
+                     family=binomial(),
+                     metric = "ROC")
+results5 = train(是否被二一~., 
+                     data=myunder, 
+                     trControl = ctrl,
+                     method='glm',
+                     family=binomial(),
+                     metric = "ROC")
+results6 = train(是否被二一~., 
+                     data=myboth, 
+                     trControl = ctrl,
+                     method='glm',
+                     family=binomial(),
+                     metric = "ROC")
 
-#ggplot(results_plr)
+resultsrf = train(是否被二一~., 
+                     data=mysmote, 
+                     trControl = ctrl,
+                     method='rf',
+                     metric = "ROC")
+
+resultssvm = train(是否被二一~., 
+                     data=mysmote, 
+                     trControl = ctrl,
+                     method='svmLinear2',
+                     metric = "ROC")
+
+resultsnb = train(是否被二一~., 
+                     data=mysmote, 
+                     trControl = ctrl,
+                     method='nb',
+                     metric = "ROC")
+```
+```{r,results='asis'}
 preds1 = predict(results1, test1_1)
 preds2 = predict(results2, test2_1)
-
-confusionMatrix(table(preds1, good_observed1_1),positive = 'yes')
-confusionMatrix(table(preds2, good_observed2_1),positive = 'yes')
-
-
-#圖
-#plot.roc(results1$pred$obs,
-         #results1$pred$yes)
-
-#plot.roc(results2$pred$obs,
-         #results2$pred$yes)
-#圖並
-#obj.rpart1=roc(results1$pred$obs~results1$pred$yes, smooth = T)
-#obj.rpart2=roc(results2$pred$obs~results2$pred$yes, smooth = T)
-#plot(obj.rpart1)
-#lines(obj.rpart2)
+preds3 = predict(results3, test3_1)
+preds4 = predict(results4, test3_1)
+preds5 = predict(results5, test3_1)
+preds6 = predict(results6, test3_1)
+predsrf = predict(resultsrf,test3_1)
+predsvm = predict(resultssvm,test3_1)
+prednb = predict(resultsnb,test3_1)
+c1<- confusionMatrix(table(preds1, good_observed1_1),positive = 'yes')
+c2 <- confusionMatrix(table(preds2, good_observed2_1),positive = 'yes')
+c3 <- confusionMatrix(table(preds3, good_observed3_1),positive = 'yes')
+c4 <- confusionMatrix(table(preds4, good_observed3_1),positive = 'yes')
+c5 <- confusionMatrix(table(preds5, good_observed3_1),positive = 'yes')
+c6 <- confusionMatrix(table(preds6, good_observed3_1),positive = 'yes')
+ctree <- confusionMatrix(table(predsrf, good_observed3_1),positive = 'yes')
+csvm <- confusionMatrix(table(predsvm, good_observed3_1),positive = 'yes')
+cnb <- confusionMatrix(table(prednb, good_observed3_1),positive = 'yes')
 ```
 
-```{r,results='asis'}
+
+
+
+# 摘要
+
+# 緒論
+
+## 研究背景
+
+現今國內外大學普遍存有督促學生學習狀況的機制，主要是以學生的在校成績作為其衡量標準，校方對於未達到標準的學生會進行懲罰的措施，旨在希望學生不要荒廢課業。
+大學退學可分為「自退」與「勒令退學」，自退為學生主動於校方申請退學，而勒令退學則屬校方強迫退學，按學校規定勒令退學將分為「非因成績退學」，以及「因成績退學」，早期之因成績退學制度普遍為「二一退學」，及實拿學分不及學期總學分二分之一便退學，然而教育部開放大學自主之後，陸續有許多學校對於退學標準做出調整，退學制度較為主流的為下列三者；較為嚴格的「三二退學」及實拿學分不及學期總學分三分之二便退學，較為寬鬆的「連續雙二一退學」即在校期間連續被二一兩次才會被退學，最後一項為「雙二一退學」，亦即在校期間累積被二一兩次才會退學，[3]交通大學註冊組組長彭淑嬌指出，十幾年前教育部開放給大學自主時，曾有一波廢除二一制度的聲浪，當時交大也因此廢除「單二一退學制度」，但後遺症很明顯，學生學習動力大幅減弱，校方只好又改採雙二一制度，雖近期陸續有學校開始廢除因成績退學制度，但目前大多數之大學仍保有著因成績退學機制；[1]研究也指出二一制度仍然對於學生可以有效達到嚇阻的功用，學生在被二一後的不及格學分比例在往後的學期會有所改善，故學生是否被二一仍是一個很好的學習成效指標。
+
+## 研究動機與目的
+
+台灣社面臨少子化的趨勢，造成各級教育機構入學人數普遍下滑，教育部因應此趨勢於民國102年推動大學整併計畫，針對一縣市有兩所以上的公立大學且單一學校學生人數在一萬人以下的公立大學推動整併；私立大學學生人數於兩千人以內，則推動退場機制。[4]為維持學校的規模，各大院校愈來愈重視學生的退學問題；若能夠於早期預測出學生退學，以減少退學的比例，對於學生與學校將會是雙贏。
+鑑於校方於學期結束後才能提供學生是否被二一之資訊，及收到警訊時可能僅剩一次機會亦或已被退學，本文希望能夠透過模型在學期開始前便有效的預測該學期是否會被二一，於學期初期便能給予老師或是周遭同學訊號，發揮同儕之間的影響力共同關懷學習上遭遇困難的學生；[2]教師對於學生學習成效之認知、情意及技能部分有顯著的影響，可見教師在學生學習過程中扮演了息息相關的角色[2]根據研究結果顯示：同儕教導學習策略對學生的「學習成就」、「情意態度」均有正向的影響，透過同儕之間給予學習上的協助，可以提高學生整體的學習成效，減少未來學生被二一的人數。
+
+# 文獻回顧
+
+目前學術表現的解釋和預測的主題被廣泛研究，在早期的研究中Tinto模型（1982）是考慮學業成功因素的主要理論框架，Tinto將整個學生流失的過程視為學生特色與學院經驗之間的社會心理相互作用。
+學生的過去與學術環境之間交互作用將導致學生融入這一新環境的程度，根據此交互作用，更高程度的教育整合與學生順利完成學習目標有著很大的關聯性。
+
+目前對於教育的資料探勘文獻比起金融、醫療領域中相對較少 Alaa and Halees（2008） ，將資料探勘運用於教育領域之中，可以提取並且評估影響學生學習的變量，以加強我們對於學習以及教育的理解，Han and Kamber（2006）將資料探勘運用於教育領域之中，又稱教育資料探勘，本文將資料探運應用於預測學生二一，達到強化學生對於學習的理解；目前國外文獻中將資料探勘應用於預測與教育相關的論文主要為預測學生的輟學行為。
+
+Kotsiantis,Pierrakeas and Pintelas（2004）對於與學生學習成效相關進行的預測，將機器學習應用於Hellenic Open University遠程教育預測中；預測出哪一類型學生輟學的可能性最高；使得遠端導師可以採取預防措施減少學生的輟學率，遠程學習是一種無需與教師在課堂上進行定期面對面上課的課程，其提到由於每個歸納學習算法都存有偏差，若某個算法在適當的領域中表現良好，很有可能在其他領域表現不佳 (Schaffer 1994)故必須對各個算法做出比較，研究中提出了六種模型，其中Naive Bayes 演算法表現最佳其平均預測準確率達至70.51%。
+
+Abu-Oda and El-Halees（2015）表示目前高等教育遭遇許多問題，導致教育機構逐步遠離了實現重視教育質量的目標，[1]大多數的原因來自於校方與學生之間的資訊落差；校方無法獲得足夠多的信息來為學生提供合適的教育，[2]數據挖掘是一種功能強大的技術，可以萃取出具有價值的知識和信息，通過數據挖掘技術可以透過預測學生的類型，使高等教育機構能夠以個別化的方式做出更好的決策，教育學生時採用更進步的計劃，並使教育機構能夠更有效地分配資源和人力[3][4]，Abu-Oda,El-Halees（2015）運用了ALAQSA 大學 計算機科學系的成績單與高中成績預測輟學的學生，預測學生是否輟學；研究中使用了決策樹模型以及Naive Bayes模型進行預測，並分別得出98.14%與96.86%兩者極高的準確度。
+
+在Dekker,Pechenizkiy and Vleeshouwers（2009）研究中提到輟學學生中有一類型的學生為風險類學生，此類型學生特點為有機率不被退學的學生；但是校方必須提供更多的資源於他們身上，他們才能免於被退學，研究中透過高中以及大學的成績資料建構決策樹模型提前預測出此類型的學生準確度高達75%至80%之間，這項研究將有助於學生與老師共同改善學生的成績表現，使得校方可以降低學生的輟學比例。
+
+Baradwaj and Pal（2012）決策樹非常受歡迎，因為它們產生的分類規則比其他分類更容易理解，本文將CART決策樹運用於分類學生的成績表現，得到不錯的預測效果，提取出來的變數可以有效預測學生在期末考的表現，它將有助於提早的識別需要幫助的學生，以利老師提供適當的諮詢與建議。
+
+Cortez and Silva（2013）使用了隨機森林、支持向量機、神經網絡以及決策樹對中學生數學科目以及葡萄牙語科目進行了成績的預測，研究顯示在已知過去成績下可以達到很高的準確率，這與Kotsiantis（2004）中的結論相互呼應：學生的現今成就表現受過去的成績表現影響很大，儘管如此預測最好的模型仍表明，在某些情況下如：學校相關（例如，缺勤人數，選擇學校的理由，額外的教育），人口統計學（例如學生的年齡，父母的工作和教育）和社交（例如和朋友外出，飲酒）變量仍存在很大的影響。
+
+Logistic regression，其被廣泛運用於學生留級等二元分類之中，PYKE&SHERIDANt（1993 ）依照學生之年齡、性別等學生背景變數與GPA、完成學位時間等學術變數以及校方提供獎學金此類的財務變數預測，結果顯示碩士生的成績表明，畢業生GPA越高、課程時間越長且所有校方提供的資金越多，顯著的影響學生是否能夠畢業，博士生若來源金費增加也能夠顯著的影響學生是否能夠順利畢業，Fletcher and Stren （1992）研究中同樣指出影響博士生最重要的因素為校方提供的獎學金。
+
+Bradle（1997）說明了與準確度比較；選則AUC評分應優先用於機器學習的評價，依據下列理由；第一點AUC將提高在ANOVA中的敏感度，第二點為AUC不受閥值選擇的影響，第三點為AUC對於陽性與陰性兩類分別給出很好的衡量，第四點為針對分類完美的模型AUC可以給出良好的反應，並且對僅能成功預測出單一類的模型給予較低的評價。
+
+# 資料說明
+
+## 資料簡介
+
+本文所使用原始資料為大學部100至106年入學學生歷年成績單資料，資料來源為國立臺北大學校務研究辦公室，成績單中含有少許100年以前入學之學生不完整資料，成績單欄位有以下幾者：系級、學號、姓名、學期成績、科目代碼、科目名稱、學分數、開課系所、修課人數、班別、授課老師、學年、學期、必選修類別（必／選／通）、授課語言、上課時間及教室。
+
+## 資料處理
+
+本文為使資料能夠有更完整的特徵以及期數預測二一，將排除修課未滿八學期者，專注於具有完整修完八學期之同學的二一預測，由於成績單中所含有資訊量過愈龐大與雜亂，無法直接預測，我們將原始成績單中各欄位改建為較為有用的特徵，預測第t學期同學是否會被二一，站在學期初僅有兩個資訊能夠得知，第一個為第t期以前特徵，第二個為第t期選課狀況此類特徵，下小節將分別介紹各類特徵。
+
+本文預測之被解釋變數為是否被二一，由於原始成績單並未存有此欄位，故本文將興建此欄位並觀察，圖1顯示100學年度起至103學年入學年，擁有完整八學期的學生中，共有4941位學生資料，其中學生被二一的人數有364筆被二一壹次的人數最為多筆，共有295筆，被二一兩次的人數有46筆；三次以上的人數則有23筆，依據本校規定一般在校生若被二一次數高於兩次便強制退學，若本校學生被二一次數超過兩次則代表該為學生為僑生或是身心障礙學生，進一步藉由學生學號第二到四碼興建入學年變數，觀察入學年之於被二一之間的關係，圖2顯示各入學年之學生被二一比例皆於一成以下，入學年對於是否被二一影響並不大，每個入學年中皆有一部分的同學對於大學教育出現不適應的狀況。
+
+```{r 1, results="asis" }
+py$df4 %>% DT::datatable()
+ggplot(py$df4 , aes(x= 二一次數,y=人數)) + geom_bar(stat="identity") + coord_flip()
+```
+
+```{r 2, results="asis" }
+ggplot(py$dfpic2_1, aes(x = 入學年, fill = 二一)) +  
+  geom_bar(position = "fill") +
+  labs(x='入學年',y = "比例",size=10) +scale_y_continuous(breaks=seq(0,1,0.1))+ scale_fill_manual(name='二一',values=c("#40E0D0", "#FF7F50"))
+```
+
+### t期以前解釋變數
+
+#### 累積二一
+
+觀察學生的累積二一狀況，圖3之橫軸為年級以及學期，11表示一年級第一學期，以此類推，圖為被二一的學生當中，累積至當期前的二一狀況，顯示一年級被二一的人數是最多的，其反映了這些被二一的學生之中，有很大的比例是不適應初上大學後的教學，而另外一處高峰位於大四，這裡隱含兩種可能；第一種為大四課比較少所以若有幾門課被當便會造成二一及途中橘色的部分；第二種為另一半剩下的部分，這些人都是曾經有被二一過而到大四又再度被二一的人；可知被二一過的同學大四時有很大的機率會延續之前的學習狀態導致大四被二一，通過初步的觀察跡象我們將加入此變數「曾被二一過次數」當作解釋變數，以預測同學未來是否會被二一。
+
+```{r 3, results="asis" }
+ggplot(py$dfpic3_1, aes(x = 年級,fill = 累積二一)) +  
+  geom_bar()+
+  labs(x='年級',y = "累積二一",size=10)+ scale_fill_discrete(name='累積二一次數')
+```
+
+#### 累計被當比
+
+成績單資料中提供最主要的訊息為學生的學習狀況，由上節分析可以得知被二一過的學生再度被二一的比例很高，代表學生在學習上初期問題會一直困擾著學生，本文以學生歷年來的修課狀況與紀錄來建構學生的學習情況，變數分別為；累計專業必修被當比例、累計共同必修被當比例、累計其他必修被當比例、累計選修被當比例以及累計通識被當比例作為捕捉修課面向的特徵，選擇比例而非堂數的原因為每人的修課數會受到系級的不同、個人是否雙主修、輔修、教育學程或是不同入學年所影響。
+
+本文依照不同的必修特性將必修分為三種類型討論，第一類為專業必修，專業必修定義為班上超過五成人所修習之必修，此專業必修的定義較接近為系上的必修科目，因於成績單之必選修類別（必／選／通）欄位會受到學生雙主修、輔修以及修習教育學程的影響，而將非本系之科目列為以上這類同學的必修課，故無法從成績單上反應該系必修課對於學生的影響，將專業必修定義於此旨在排除這類特殊狀況的影響；第二類為全校共同必修，本校共同必修涵蓋體育、英文、英文聽講、軍訓以及國文，此類相對專業科目來說負擔較輕，若學生於此科目有著很高的被當比例可能代表著學生對於大學教育高度的不適應；第三類為其他類，及排除上兩類後剩下成績單中所顯示為必修的科目，及雙主修、輔修、教育學程同學所多出的科目。
+
+```{r}
+p1 <- ggplot(py$dfpic4, aes(x=年級, y=累積專業必修被當, fill=是否被二一)) + 
+    geom_boxplot(outlier.shape = NA)+labs(x='年級',y = "累積專業必修被當數") + scale_fill_manual(name='是否被二一',values=c("#40E0D0", "#FF7F50")) +theme(axis.text=element_text(size=8),
+        axis.title=element_text(size=8,face="bold"))
+```
+```{r}
+p1_1 <- ggplot(py$dfpic4_1, aes(x=年級, y=累積共同必修被當, fill=是否被二一)) + 
+    geom_boxplot(outlier.shape = NA)+labs(x='年級',y = "累積共同必修被當數",size=5)  + scale_fill_manual(name='是否被二一',values=c("#40E0D0", "#FF7F50"))+theme(axis.text=element_text(size=8),
+        axis.title=element_text(size=8,face="bold"))
+```
+```{r}
+p1_2 <- ggplot(py$dfpic4_2, aes(x=年級, y=累積其他必修被當, fill=是否被二一)) + 
+    geom_boxplot(outlier.shape = NA)+labs(x='年級',y = "累積其他必修被當數",size=5)  + scale_fill_manual(name='是否被二一',values=c("#40E0D0", "#FF7F50"))+theme(axis.text=element_text(size=8),
+        axis.title=element_text(size=8,face="bold"))
+```
+```{r}
+p2 <- ggplot(py$dfpic5, aes(x=年級, y=累積選修被當, fill=是否被二一)) + geom_boxplot(outlier.shape = NA)+labs(x='年級',y = "累積選修被當數",size=10)  + scale_fill_manual(name='是否被二一',values=c("#40E0D0", "#FF7F50"))+theme(axis.text=element_text(size=8),
+        axis.title=element_text(size=8,face="bold"))
+```
+```{r}
+p3 <- ggplot(py$dfpic6, aes(x=年級, y=累積通識被當, fill=是否被二一)) + 
+    geom_boxplot(outlier.shape = NA)+labs(x='年級',y = "累積通識被當數",size=10)  + scale_fill_manual(name='是否被二一',values=c("#40E0D0", "#FF7F50"))+theme(axis.text=element_text(size=8),
+        axis.title=element_text(size=8,face="bold"))
+```
+```{r 4, results="asis" }
+multiplot(p1,p1_1,p1_2,cols=1)
+```
+```{r 5, results="asis" }
+multiplot(p2,p3,cols=1)
+```
+
+圖4中可以明顯看出沒被二一類型的學生在於累積其他必修被當以及累積共同必修被當數上中位數皆為0，直至累積專業必修被當數時才略高，而被二一的同學除了累積其他必修被當於一二年級以外，皆明顯高於沒被二一者，沒被二一者累積其他必修被當數為0的情況為，該類型同學因學校規定較不易去輔修雙主修等，所以在此類必修中明顯比其他兩類被當數來得少。
+
+圖5為累積選修被當數以及累積通是被當數，通識相對於其他科目來說是一門負擔就沒這麼重的課，故可以看到沒被二一者的通識課程中物稅為0，有被二一者則在三年級後被當數的75百分位數高出沒被二一找許多，一、二年級從圖中看之所以無意的原因為大部分的學生皆在大三時才開始修習通識課程，從累積選修科目被當也反應了被二一者的表現比較差。
+
+累積被當中位數應該要隨著年級越高而提高頂多持平，而圖4圖5於大四下時會下降的原因為，同學延畢的關係；成績單在延畢後的第一學期會顯示四上（事實上是五上），而延畢之後越往後的學期，一般而言學生會大幅減少自己被當的科目以利順利畢業，故五下的被當數通常會比五上少；導致四上累積被當中位數會比四下多。
+
+#### 必修/選修/通識成績表現
+
+上節節中討論了必選修以及通識課的被當狀況，了解被當的狀況之後，成績單上可以萃取的資訊中還有排名，在此進一步討論成績對於二一所帶來的影響，成績衡量將以臺北大學GPA計算方式衡量，定義如下：
+
+成績衡量方式：GPA＝GPA加權總和÷總學分數。
+
+成績 | GPA成績
+---------|---------
+80 ~100  | 4
+70 ~  79 | 3
+60 ~  69 | 2
+50 ~  59 | 1
+低於 50  | 0
+
+依據累積學期進行GP成績換算，運用GPA與同年級且同入學年的學生進行排名比較，觀察成績排名對於兩類人是否有很大的差異。
+
+```{r ,warning=FALSE,message=FALSE}
+p1 <- ggplot(py$dfpic8_1, aes(x=年級, y=pr, fill=是否被二一)) + 
+    geom_boxplot( outlier.shape = NA) + 
+    labs(x='年級',y = "累積專業必修pr",size=10) + scale_fill_manual(name='是否被二一',values=c("#40E0D0", "#FF7F50"))+theme(axis.text=element_text(size=8),
+        axis.title=element_text(size=8,face="bold"))
+p2 <- ggplot(py$dfpic8_2, aes(x=年級, y=pr, fill=是否被二一)) + 
+    geom_boxplot( outlier.shape = NA)+ 
+    labs(x='年級',y = "累積共同必修pr",size=10) + scale_fill_manual(name='是否被二一',values=c("#40E0D0", "#FF7F50"))+theme(axis.text=element_text(size=8),
+        axis.title=element_text(size=8,face="bold"))
+p3 <- ggplot(py$dfpic8_3, aes(x=年級, y=pr, fill=是否被二一)) + 
+    geom_boxplot( outlier.shape = NA)+ 
+    labs(x='年級',y = "累積其他必修pr",size=10)  + scale_fill_manual(name='是否被二一',values=c("#40E0D0", "#FF7F50"))+theme(axis.text=element_text(size=8),
+        axis.title=element_text(size=8,face="bold"))
+p4 <- ggplot(py$dfpic8_4, aes(x=年級, y=pr, fill=是否被二一)) + 
+    geom_boxplot( outlier.shape = NA)+ scale_fill_manual(name='是否被二一',values=c("#40E0D0", "#FF7F50")) +theme(axis.text=element_text(size=8),
+        axis.title=element_text(size=8,face="bold"))
+    scale_fill_discrete(name="是否被二一") 
+p5 <- ggplot(py$dfpic8_5, aes(x=年級, y=pr, fill=是否被二一)) + 
+    geom_boxplot( outlier.shape = NA)+ 
+    labs(x='年級',y = "累積通識pr",size=10) + scale_fill_manual(name='是否被二一',values=c("#40E0D0", "#FF7F50"))+theme(axis.text=element_text(size=8),
+        axis.title=element_text(size=8,face="bold"))
+```
+```{r 6, results="asis" }
+multiplot(p1, p2,p3 ,cols=1)
+```
+```{r 7, results="asis" }
+multiplot(p4,p5 ,cols=1)
+```
+
+圖6為前文提到三種類型必修pr表現，在累積專業必修pr值上與累積共同必修pr直上沒被二一找皆表現的比較低，而累積其他必修pr在二上兩類型的學生成績表現看起來並無太大差異，主因爲一、二年級修其他必修課的人數較少。
+
+圖7為通識以及選修之累積pr表現，被二一類的學生在於排名上也明顯是低於沒被二一類。
+
+### 第t期解釋變數
+
+##### 學期課業衡量
+
+在學期尚未開始前我們從成績單上能得知關於該學期特徵資訊僅有該學期必修數、選修數、通識數此類修課狀況特徵，為了能夠有效衡量學生在該學期修課的繁重程度，衡量方式將依據不同的課型有所差異，此處必修課僅拆成兩類；專業與其他必修以及共同必修，主因為其他必修類必修課通常為輔系、雙主修或是修習教育學程者才會出現的必修型態，此類與專業必修課在繁重程度上是相同的。
+專業與其他必修衡量特徵是以第t學期專業與其他必修修課數除以本系專業必修數；通過該學期佔了多少本系應修必修的比例作為衡量該學期凡種程度的指標，共同必修衡量特徵則是以共同必修修課數除以四，除以四的原因為全校共同必修僅有四門課程分別為國文、英文、英聽、歷史，通識類課程衡量方式是以該學期通識修課數除以六，統一除以六原因為學校規定最低畢業門檻為修滿六門通識課，選修類型課程因各系要求畢業學分不同且必修數也不同，以該學期選修課數除以各班的選修中位數，以代替除以真實選修中位數。
+
+```{r results='asis',warning=FALSE}
+p1 <- ggplot(py$dfpic11, aes(x=年級, y=該學期專業與其他必修修課比例, fill=是否被二一))+ geom_boxplot( outlier.shape = NA) + ylim(0,1)+labs(x='年級',y = "該學期專業與其他必修修課比例",size=10) + scale_fill_manual(name='是否被二一',values=c("#40E0D0", "#FF7F50"))+theme(axis.text=element_text(size=8),
+        axis.title=element_text(size=8,face="bold"))
+p2 <- ggplot(py$dfpic12, aes(x=年級, y=該學期選修修課比例, fill=是否被二一))+ geom_boxplot( outlier.shape = NA) + ylim(0,1)+labs(x='年級',y = "該學期選修修課比例標",size=10) + scale_fill_manual(name='是否被二一',values=c("#40E0D0", "#FF7F50"))+theme(axis.text=element_text(size=8),
+        axis.title=element_text(size=8,face="bold"))
+p3 <- ggplot(py$dfpic13, aes(x=年級, y=該學期通識修課比例, fill=是否被二一))+ geom_boxplot( outlier.shape = NA) + ylim(0,1)+labs(x='年級',y = "該學期通識修課比例標",size=10) + scale_fill_manual(name='是否被二一',values=c("#40E0D0", "#FF7F50"))+theme(axis.text=element_text(size=8),
+        axis.title=element_text(size=8,face="bold"))
+p4 <- ggplot(py$dfpic14, aes(x=年級, y=該學期共同必修修課比例, fill=是否被二一))+ geom_boxplot( outlier.shape = NA) + ylim(0,1)+labs(x='年級',y = "該學期共同必修修課比例",size=10) + scale_fill_manual(name='是否被二一',values=c("#40E0D0", "#FF7F50"))+theme(axis.text=element_text(size=8),
+        axis.title=element_text(size=8,face="bold"))
+```
+```{r 8, results="asis" }
+multiplot(p1,p2,cols=1)
+```
+```{r 9, results="asis" }
+multiplot(p3,p4,cols=1)
+```
+
+## 同儕面向觀察
+
+被二一的同學很多時候不僅是學習上的問題，部分原因可能是受同儕間的影響，圖10為藉由大學四年來與自己修課重疊度最高的同學在成績上的關聯圖，縱軸為課重疊度最高同學的特徵，橫軸為個人特徵，顯示出修課面向中的幾個特徵受到同儕的影響皆為正相關，為了能夠捕捉同儕面向的特徵，將引入群聚指標解釋變數。
+
+```{r results='asis',message=FALSE}
+p1 <- ggplot(py$dfpic10_1, aes(x=f累積專業必修被當比, y=累積專業必修被當比, color=年級)) + 
+    geom_point(size=2, alpha=0.8)+labs(x='f累積專業必修被當比',y = "累積專業必修被當比",size=10) +scale_fill_discrete(name="年級") + scale_colour_manual(name = "年級",values = c("skyblue", "skyblue", "green",'pink','red'))+
+  geom_smooth(method = "lm", color="red", linetype=2)+theme(axis.text=element_text(size=8),
+        axis.title=element_text(size=8,face="bold"))
+
+p2 <- ggplot(py$dfpic10_2, aes(x=f累積共同必修被當比, y=累積共同必修被當比, color=年級)) + 
+   geom_point(size=2, alpha=0.8)+labs(x='f累積共同必修被當比',y = "累積共同必修被當比",size=10) +scale_fill_discrete(name="年級") +scale_fill_discrete(name="年級") + scale_colour_manual(name = "年級",values = c("skyblue", "green",'pink','yellow'))+
+  geom_smooth(method = "lm", color="red", linetype=2)+theme(axis.text=element_text(size=8),
+        axis.title=element_text(size=8,face="bold"))
+
+p3 <- ggplot(py$dfpic10_3, aes(x=f累積其他必修被當比, y=累積其他必修被當比, color=年級)) + 
+ geom_point(size=2, alpha=0.8)+labs(x='f累積其他必修被當比',y = "累積其他必修被當比",size=10) +scale_fill_discrete(name="年級")+scale_fill_discrete(name="年級") + scale_colour_manual(name = "年級",values = c("skyblue", "green",'pink','yellow'))+ geom_smooth(method = "lm", color="red", linetype=2)+theme(axis.text=element_text(size=8),
+        axis.title=element_text(size=8,face="bold"))
+
+p4 <- ggplot(py$dfpic10_4, aes(x=fprcommon1_1, y=prcommon1_1, color=年級)) + 
+    geom_point(size=2, alpha=0.8)+labs(x='f專業必修pr',y = "專業必修pr",size=10) +scale_fill_discrete(name="年級")+scale_fill_discrete(name="年級") + scale_colour_manual(name = "年級",values = c("skyblue", "green",'pink','yellow'))+
+  geom_smooth(method = "lm", color="red", linetype=2)+theme(axis.text=element_text(size=8),
+        axis.title=element_text(size=8,face="bold"))
+
+p5 <- ggplot(py$dfpic10_5, aes(x=fprcommon2_1, y=prcommon2_1, color=年級)) + 
+    geom_point(size=2, alpha=0.8)+labs(x='f共同必修pr',y = "共同必修pr",size=10) +scale_fill_discrete(name="年級")+scale_fill_discrete(name="年級") + scale_colour_manual(name = "年級",values = c("skyblue", "green",'pink','yellow'))+
+  geom_smooth(method = "lm", color="red", linetype=2)+theme(axis.text=element_text(size=8),
+        axis.title=element_text(size=8,face="bold"))
+
+p6 <- ggplot(py$dfpic10_6, aes(x=fprcommon3_1, y=prcommon3_1, color=年級)) + 
+    geom_point(size=2, alpha=0.8)+labs(x='f其他必修pr',y = "其他必修pr",size=10) +scale_fill_discrete(name="年級")+scale_fill_discrete(name="年級") + scale_colour_manual(name = "年級",values = c("skyblue", "green",'pink','yellow'))+
+  geom_smooth(method = "lm", color="red", linetype=2)+theme(axis.text=element_text(size=8),
+        axis.title=element_text(size=8,face="bold"))
+
+p7 <- ggplot(py$dfpic10_7, aes(x=fprselect, y=prselect, color=年級)) + 
+    geom_point(size=2, alpha=0.8)+labs(x='f選修pr',y = "選修pr",size=10) +scale_fill_discrete(name="年級")+scale_fill_discrete(name="年級") + scale_colour_manual(name = "年級",values = c("skyblue", "green",'pink','yellow'))+
+  geom_smooth(method = "lm", color="red", linetype=2)+theme(axis.text=element_text(size=8),
+        axis.title=element_text(size=8,face="bold"))
+
+p8 <- ggplot(py$dfpic10_8, aes(x=fprgernal, y=prgernal, color=年級)) + 
+    geom_point(size=2, alpha=0.8)+labs(x='f通識pr',y = "通識pr",size=10) +scale_fill_discrete(name="年級")+scale_fill_discrete(name="年級") + scale_colour_manual(name = "年級",values = c("skyblue", "green",'pink','yellow'))+
+  geom_smooth(method = "lm", color="red", linetype=2)+theme(axis.text=element_text(size=8),
+        axis.title=element_text(size=8,face="bold"))
+
+p9 <- ggplot(py$dfpic10_9, aes(x=f累積選修被當比, y=累積選修被當比, color=年級)) + 
+    geom_point(size=2, alpha=0.8)+labs(x='f累積選修被當比',y = "累積選修被當比",size=10) +scale_fill_discrete(name="年級")+scale_fill_discrete(name="年級") + scale_colour_manual(name = "年級",values = c("skyblue", "green",'pink','yellow'))+
+  geom_smooth(method = "lm", color="red", linetype=2)+theme(axis.text=element_text(size=8),
+        axis.title=element_text(size=8,face="bold"))
+
+p10 <- ggplot(py$dfpic10_10, aes(x=f累積通識被當比, y=累積通識被當比, color=年級)) + 
+    geom_point(size=2, alpha=0.8)+labs(x='f累積通識被當比',y = "累積通識被當比",size=10) +scale_fill_discrete(name="年級")+scale_fill_discrete(name="年級") + scale_colour_manual(name = "年級",values = c("skyblue", "green",'pink','yellow'))+
+  geom_smooth(method = "lm", color="red", linetype=2)+theme(axis.text=element_text(size=8),
+        axis.title=element_text(size=8,face="bold"))
+```
+```{r 10, results="asis" }
+multiplot(p1,p4,p5,p6,p7,p8,cols=2)
+#multiplot(p9,p10 ,cols=1)
+#multiplot( ,cols=1)
+#multiplot( ,cols=1)
+```
+
+### 群聚指標解釋變數
+
+累積群聚指標是衡量一學生在累積至第t期學期前在課堂之中會見到多少同班同學，因各班的修課數不同、畢業學分也不同；班定義為同系且同入學年者，分別以各班平均以及標準差，標準化此指標，圖11顯示隨著年級的上升兩類型學生的差異會越來越大，主因為被二一的學生到後期必須去補足以前被當的科目而將導致與同班同學的課脫節，進而影響此特徵，不僅累積群聚指標在學期開始前校方也可以得知下學期所有修課同學的統計，故也加入第t期學期之標準化群聚指標作為變數。
+
+```{python}
+dfpic9['是否被二一']=dfpic9['是否被二一'].astype(str)
+```
+```{r 11,results='asis',warning=FALSE}
+ggplot(py$dfpic9, aes(x=年級 , y=累積標準化群聚指標, fill = 是否被二一)) + 
+    geom_boxplot( outlier.shape = NA)+ scale_fill_manual(name='是否被二一',values=c("#40E0D0", "#FF7F50"))+labs(x='年級',y = "累積標準化群聚指標",size=10)
+```
+
+# 資料觀察
+
+```{r 12,results='asis',message=FALSE}
+ggcorr(py$dfpic99,geom="circle", size = 2,,method = c("everything", "pearson"))
+```
+
+圖12為各變數之間的相關程度，prcommon1_1為、prcommon2_1、prcommon3_1、prselect、prgernal分別為累積專業必修pr、累積共同必修pr、累積其他必修pr、累積選修pr以及累積通識pr，圖中可以觀察至幾個變數之間相關性較高，如累積專業必修被當與累積共同必修被當比呈現正相關，而各類型pr之間的影響於圖中皆為正相關，這些特徵之間的關係皆顯示成績上的表現是會互相影響的，反應出學生對於大學教育的不適應而非對於單一類別科目的不熟悉而導致，故若能透過預測學生二一行為，儘早使校方採取預防措施，對於學校整體的教學是有利的。
+
+# 研究方法
+
+## logistic
+
+羅吉斯回歸分析（Long 1997）將多元回歸分析技術擴展至解釋變數為類別變數，根據邏輯斯函數用於二元應變數分析的理論，係假設理論上存在代表事件發生可能性的連續反應變數 $y_i$ ，其值介於 $-\infty$ 至 $+\infty$ ，若該變數的值超過臨界值c 時，則導致事件發生，當 $y_i$ 比c大時，代表事件發生及 $y_i=1$ ；而當 $y_i$ 不比c大時則代表事件未發生及 $y_i=0$ 。
+
+本文所使用模型為：
+
+$$
+\begin{array}{lcl}
+Y_{i}^*&=&\beta_0+\sum_{j=1}^{k}\beta_i X_{i,j}+\epsilon_{i}\\
+Y_{i}&=&I(Y_{i}^*>0),
+\end{array}
+$$
+
+其中 $\beta$ 為待估計參數 $\epsilon_{i}$ 為隨機誤差項， $Y_{i}^*$ 為一代表學生於大學教育適應程度之潛伏變數， $Y_{i}^*>0$ 代表不適應於大學教育，此變數無法直接得知，故利用可以觀察之變數 $Y_i$ 做為代理變數，其透過函數I轉換成 $Y_i$ ，定義當 $Y_i=1$ 時的機率如下：
+
+$Pr(Y=1|feature, X)= prob \left[epsilon_{i} > (\beta_0+\sum_{j=1}^{k}\beta_i X_{i,j})\right]\\= 1-F\left [-(\beta_0+\sum_{j=1}^{k}\beta_i X_{i,j})\right]\\=F\left[\beta_0+\sum_{j=1}^{k}\beta_i X_{i,j}\right]$
+
+其中，F為 $\epsilon_{i}$ 的累積機率分配函數概似函數為：
+
+$$
+L=\prod_{Y_i=1}^{n}p_i\prod_{Y_i=0}^n(1-p_i)
+$$
+
+假設F函數服從Logistic分配如下：
+
+$$
+F(Z_i)=\frac{e^{Z_i}}{1+e^{Z_i}}\\
+Zi=\beta_0+\sum_{j=1}^{k}\beta_i X_{i,j}
+$$
+
+運用最大概似法估計 $\beta_i$ ，本模型假設殘差項的累積機率分配函數為 Logistic分配，能確保其估計機率值落於0與1之間。
+
+## 隨機森林
+
+介紹隨機森林之前，必須先介紹決策樹，決策樹是用來處理分類問題的樹狀結構，由Breiman,Friedman,Olshen,Stone於1984年所提出，CART（Classification and regression tree）演算法中擁有根、節、點、葉等結構如圖，每個樹上的節點皆為一次伯努力實驗，每個節點中CART會將資料分成兩種資料集，當每筆資料都在同一個類別或是當節點無法再找出新的類進行節點分隔時便會停止，步驟如圖：
+
+<img src= https://imgur.com/ZTC8yiM.jpg>
+
+CART在建構決策樹過程中，以吉尼獲利(Gini Gain)為準則，並選擇最大的吉尼獲利值作為分類屬性；Gini impurity 為一衡量資訊量的指標，越高代表其反映的資訊量越大，定義如下：
+
+$$
+
+Gini(S)=1−\sum_{n\in S}p_{i}^2
+
+$$
+
+n為資料集S中所包含的類別，p為某類占資料的比例。
+
+Gini Gain（吉尼獲利）定義為：
+
+$$
+GiniGain(A,S)=Gini(S)−Gini(A,S)=Gini(S)−\sum _{n\in S}\frac{\left |S_n \right|}{\left |S \right|} Gini(S_n)
+$$
+
+S利用特徵A來分割成n個 $S_i$ ，得到不同的GiniGain(A,S)，以本文訓練集特徵年級為例，訓練集中被二一人數為398，沒被二一為35319，初始吉尼不純度為：
+
+$$
+i(Node_{before}) = 1-\left[(\frac{398 }{35717})^2+(\frac{35319}{35717})^2\right]=0.022038
+$$
+
+由年級分裂成兩個節點，假設左節點為大一下至大三上，沒被二一以及被二一的人數分別為14657與157，右節點為大三下至大四下，沒被二一以及被二一的人數分別為15764與194，此時不純度的計算如下：
+
+$$
+
+i(Node_{left}) = 1- \left [(\frac {14657}{14814})^2 + (\frac {154}{14814})^2 \right] = 0.0209758 \\
+
+i(Node_{right}) = 1- \left [(\frac {15764
+}{15958})^2+(\frac {194}{15958})^2  \right] = 0.0240182 \\
+
+$$
+
+$$
+0.022038-(\frac {15958}{30772})(0.0209758)+(\frac {14814}{30772})(0.0240182)=-0.00040244
+$$
+
+此例中吉尼獲利為負，代表此分割後得到了更少的資訊，決策樹會依照各特徵中可以使得吉尼獲利最大的的特徵往下分裂。
+
+隨機森林由 Breiman Leo[2001]所提出，其基本原理為結合多棵CART樹，並加入隨機分配的訓練資料，以大幅增進最終的運算結果，此方法為Ensemble Method（集成方法）的一類，其想法為如果單個分類器表現不錯，那麼將多個分類器組合起來，其表現會優於單個分類器，建構模型的步驟為:
+
+1. 決定隨幾森林中需要多少棵樹，個數推薦約64~128[9]，假設為K棵樹。
+
+2. 利用Bagging方式建造K棵決策樹，Bagging於1996年由Breiman提出（Bootstrap aggregating），此種方法會從訓練集中隨機抽取K個樣本集，並且取後放回，再從這K個樣本集中訓練出K棵數。
+
+3. 由K棵決策樹共同預測應變數，出現最多的類別則預測為該類。
+
+隨機森林的建構模型的方法是生成很多棵決策樹，由這些決策樹的結果去投票得出最終預測，其中這些決策樹必須有所差異，除了使用Bagging的方式讓K棵決策樹有所差異，在隨機森林的決策樹生成時，也可從總變數中隨機抽取q個變數來當作此樹的分割變數，造成樹之間的差異性。
+
+## Naive Bayes classifier
+
+## 支持向量機
+
+支援向量機(Support Vector Machines；SVM)是由Vapnik在1995年所提出之方法，利用區分超平面(Separating
+Hyperplane) 來分隔資料中不同的類別，而SVM中又分為線性與非線性，SVM的基本概念為找到一個決策邊界(decision boundary)讓兩類之間的邊界(margins)最大化，使其可以完美區隔開來。
+
+以本文其中兩個特徵為例，分別為累積通識被當比與累積選修被當比分別簡稱為通識以及選修 ，假設有5組被二一以及5組沒被二一的資料分散於二維平面其中：
+
+$$
+ x_i=\left[
+ \begin{matrix}
+   通識 \\
+   選修
+  \end{matrix}
+  \right] \ ，y_i=
+  \left\{ \begin{array}{ll}
+           +1 , if \ \ \ 被二一\\
+           -1 , if \ \ \ 沒被二一   
+        \end{array} \right.
+$$
+
+$$
+被二一 \ (y_i=1) \ 代表 \ w^{\mathrm{T}}x + b \geq 1 \\
+沒被二一 \ (y_i=-1) \ 代表 \ w^{\mathrm{T}}x + b < 1 \\
+整理為 \ y_i(w^{\mathrm{T}}x_i) + b < 1 ,\forall i = 1,2,...,n
+$$
+
+SVM在找Optimal hyperplane就是希望區隔兩類之間的邊界(2/|w|)可以越大越好。
+
+
+
+
+## 資料集
+
+本文將資料分割成兩個資料集，訓練集以及測試集分別佔總資料70%與30%，測試集僅於最後選定模型之後套入模型使用，訓練集主要為訓練分類器；並透過10疊交叉驗證集來訓練超參數。
+參數與超參數的區別為，參數是指選定的機器學習技術中用來調整資料的變數；如羅吉斯回歸中的權重 $\beta_i$ ，超參數與訓練資料沒有直接關聯屬於設定變數，參數在訓練時會不斷修正而超參數並不會改變；如隨機森林中的K棵樹的選定以及隨機抽取q個特徵，而如何得到更好得超參數一個方法為運用驗證集來調整，
+
+
+
+## SMOTE
+
+不平衡資料指的是資料中類別的不平均，以本文資料為例被二一資料筆數僅有398筆，而整體資料總筆數為353191，本文所使用資料為不平衡資料，以總體分類準確率為學習目標的傳統分類演算法會過多地關注於多數類，從而使得少數類樣本的分類效能下降，絕大多數常見的機器學習演算法對於不平衡資料集都不能很好的分類，故本文使用Synthetic Minority Over-sampling Technique簡稱為SMOTE（Chawla,Bowyer,Hall and Kegelmeyer,2002）方法以解決此問題，其出發點為增加更多較少一類的樣本數，也就是本資料中的被二一樣本點，其建法步驟如下：
+
+1.  隨機選定一個為被二一的樣本點s
+
+2.  從s附近找出k個樣本點
+
+3.  從k個點中隨機選取一個樣本r
+
+4.  合成新的樣本點s'，新生成的點在r與s之間的連線上。
+
+$$ s'= \lambda s+(1−\lambda)r,\lambda \in (0,1) $$
+
+## 驗證指標
+
+早期對於機器學習的相關文獻評價分類器的好壞主要以準確度，然而在某些情況單以準確度來評價一模型的好壞並不是很好的指標，利用表1來說明準確度，準確度為 :
+
+$$
+\frac{True Positive + True Negative}{True Positive + True Negative + False Positive +False Negative}
+$$
+以下將分別簡稱True Positive、True Negative、False Positive、False Negative為TP、TN、FP、FN
+當資料為不平衡資料時，如本文資料中沒被二一類的資料遠高於被二一類，及Positive類少，分類器如將全部的資料都遇測為沒被二一類（Negative），則TN數值會很高，其準確度仍可以達到很高，故本文分類器驗證指標利用受試者操作特性曲線 (Receiver Operating Characteristic，ROC)來作為評價標準。
+
+<img src= https://imgur.com/6Kkkinq.jpg>
+
+早期ROC與AUC主要利用於生物醫學上，後也開始被廣泛使用於機器學習，在相關的驗證研究的文獻當中，ROC曲線可謂最常被使用來驗證整體模型效度之方法，透過調整其閥值來衡量分類正確與錯誤的次數，藉此來呈現敏感度與誤查率之間的抵換關係，ROC曲線橫軸為誤查率，縱軸為敏感度，敏感度定義為 $\frac{TP}{TP+ FN}$ ，所刻畫的是分類器所分類出的正例占實際上為正例的比例，誤查率定義為 $\frac{TN}{FP+ TN}$ ，在資料中每筆資料經模型判斷後皆有一機率，此機率為各筆資料為正例的機率，將該各機率設為模型判定是否為正例的閥值並繪於ROC曲線上，每一閥值會對應一組敏感度與誤查率，此兩指標具有抵換關係，假設原模型被視為正例的閥值為0.5，及模型預測該點為正例的機率大於0.5便為正例，反之則為負例。如果減少閥值至0.1，則能識別出更多正例，也就是提高了敏感度，但同時也將更多的負例識為正例，即降低了誤查率，在統計學上又將FP稱為「型一錯誤」，FN稱為「型二錯誤」，在ROC 曲線上，隨著臨界點的遞增，敏感度和所對應的誤查率均會呈現遞增狀況；而優劣評分系統之間的差別完全是在於誤查率成本增加速度的快慢，所以在已繪製好的 ROC 曲線上要如何選取臨界點，完全取決於操作者較注重於型一錯誤或是型二錯誤。
+
+<img src= https://imgur.com/Nf33eAD.jpg>
+
+<img src= https://imgur.com/HKOz5GG.jpg>
+
+ROC曲線提供了一個方便觀察模型優劣的方法，觀察ROC曲線圖的幾個點；若為（0,0）則代表該分類器預測所有樣本皆為負例，（1,1）則全數預測為正例，（0,1）則是將所有樣本都正確分類，（1,0）則為全樣本都錯誤分類，所以ROC曲線若能向左上角靠則代表此分類器擁有越好的分類效果， ，當一個模型的預測能力完美時，ROC曲線會在左方與縱軸貼齊，上方與橫軸貼齊；ROC曲線越往左上則代表分類效果越好，而當ROC曲線貼合於對角線則代表此模型為隨機模型，即此模型沒有任何預測能力，若當ROC曲線之間出現交錯或難以觀察的狀況時，可藉由ROC曲線下的面積AUC（Area Under Curve）來評定分類器的好壞，及ROC曲線下的面積占整體橫縱軸所行程之四方形面積的比例，若為1代表完美模型，0.5則代表此模型毫無預測能力，一般模型此值皆介於0.5至1之間，若於0.5以下則代表該分類器具有相反的分類效果。
+
+# 模型結果
+
+```{r,warning=FALSE,message=FALSE,error=FALSE}
 g1 <- ggplot(results1$pred, aes(m=yes, d=factor(obs, levels = c("no", "yes")))) + 
   geom_roc(n.cuts=0) + 
   coord_equal() +
-  style_roc()
-g1 <- g1 +  annotate("text", x=0.75, y=0.25, label=paste("AUC =", round((calc_auc(g1))$AUC, 3)))
+  style_roc()+
+  labs(title='logistic')+
+  theme(plot.title=element_text(face="bold",size=5,hjust = 0.5),
+        axis.title.x = element_text(size = 5),
+        axis.title.y =  element_text(size = 5)) + 
+  scale_x_continuous(breaks=seq(0, 1, 0.5)) + 
+  scale_y_continuous(breaks=seq(0, 1, 0.5)) 
+g1 <- g1 +  annotate("text", x=0.75, y=0.25, label=paste("AUC =", round((calc_auc(g1))$AUC, 2)),size=2)
 
 g2 <- ggplot(results2$pred, aes(m=yes, d=factor(obs, levels = c("no", "yes")))) + 
   geom_roc(n.cuts=0) + 
   coord_equal() +
-  style_roc()
-g2 <- g2 +  annotate("text", x=0.75, y=0.25, label=paste("AUC =", round((calc_auc(g2))$AUC, 3)))
-multiplot(g1,g2 ,cols=2)
+  style_roc()+
+  labs(title='logistic weight')+
+  theme(plot.title=element_text(face="bold",size=5,hjust = 0.5),
+        axis.title.x = element_text(size = 5),
+        axis.title.y =  element_text(size = 5)) + 
+  scale_x_continuous(breaks=seq(0, 1, 0.5)) + 
+  scale_y_continuous(breaks=seq(0, 1, 0.5)) 
+g2 <- g2 +  annotate("text", x=0.75, y=0.25, label=paste("AUC =", round((calc_auc(g2))$AUC, 2)),size=2)
+
+
+g3 <- ggplot(results3$pred, aes(m=yes, d=factor(obs, levels = c("no", "yes")))) + 
+  geom_roc(n.cuts=0) + 
+  coord_equal() +
+  style_roc()+
+  labs(title='logistic smote')+
+  theme(plot.title=element_text(face="bold",size=5,hjust = 0.5),
+        axis.title.x = element_text(size = 5),
+        axis.title.y =  element_text(size = 5)) + 
+  scale_x_continuous(breaks=seq(0, 1, 0.5)) + 
+  scale_y_continuous(breaks=seq(0, 1, 0.5)) 
+g3 <- g3 +  annotate("text", x=0.75, y=0.25, label=paste("AUC =", round((calc_auc(g3))$AUC, 2)),size=2)
+
+g4 <- ggplot(results4$pred, aes(m=yes, d=factor(obs, levels = c("no", "yes")))) + 
+  geom_roc(n.cuts=0) + 
+  coord_equal() +
+  style_roc()+
+  labs(title='logistic over')+
+  theme(plot.title=element_text(face="bold",size=5,hjust = 0.5),
+        axis.title.x = element_text(size = 5),
+        axis.title.y =  element_text(size = 5)) + 
+  scale_x_continuous(breaks=seq(0, 1, 0.5)) + 
+  scale_y_continuous(breaks=seq(0, 1, 0.5)) 
+g4 <- g4 +  annotate("text", x=0.75, y=0.25, label=paste("AUC =", round((calc_auc(g4))$AUC, 2)),size=2)
+
+g5 <- ggplot(results5$pred, aes(m=yes, d=factor(obs, levels = c("no", "yes")))) + 
+  geom_roc(n.cuts=0) + 
+  coord_equal() +
+  style_roc()+
+  labs(title='logistic under')+
+  theme(plot.title=element_text(face="bold",size=5,hjust = 0.5),
+        axis.title.x = element_text(size = 5),
+        axis.title.y =  element_text(size = 5)) + 
+  scale_x_continuous(breaks=seq(0, 1, 0.5)) + 
+  scale_y_continuous(breaks=seq(0, 1, 0.5)) 
+g5 <- g5 +  annotate("text", x=0.75, y=0.25, label=paste("AUC =", round((calc_auc(g5))$AUC, 2)),size=2)
+
+g6 <- ggplot(results6$pred, aes(m=yes, d=factor(obs, levels = c("no", "yes")))) + 
+  geom_roc(n.cuts=0) + 
+  coord_equal() +
+  style_roc()+
+  labs(title='logistic both')+
+  theme(plot.title=element_text(face="bold",size=5,hjust = 0.5),
+        axis.title.x = element_text(size = 5),
+        axis.title.y =  element_text(size = 5)) + 
+  scale_x_continuous(breaks=seq(0, 1, 0.5)) + 
+  scale_y_continuous(breaks=seq(0, 1, 0.5)) 
+g6 <- g6 +  annotate("text", x=0.75, y=0.25, label=paste("AUC =", round((calc_auc(g6))$AUC, 2)),size=2)
+
+g7 <- ggplot(resultsrf$pred, aes(m=yes, d=factor(obs, levels = c("no", "yes")))) + 
+  geom_roc(n.cuts=0) + 
+  coord_equal() +
+  style_roc()+
+  labs(title='random forest')+
+  theme(plot.title=element_text(face="bold",size=5,hjust = 0.5),
+        axis.title.x = element_text(size = 5),
+        axis.title.y =  element_text(size = 5)) + 
+  scale_x_continuous(breaks=seq(0, 1, 0.5)) + 
+  scale_y_continuous(breaks=seq(0, 1, 0.5)) 
+g7 <- g7 +  annotate("text", x=0.75, y=0.25, label=paste("AUC =", round((calc_auc(g7))$AUC, 2)),size=2)
+
+g8 <- ggplot(resultssvm$pred,aes(m=yes, d=factor(obs, levels = c("no", "yes")))) + 
+  geom_roc(n.cuts=0) + 
+  coord_equal() +
+  style_roc()+
+  labs(title='svm')+
+  theme(plot.title=element_text(face="bold",size=5,hjust = 0.5),
+        axis.title.x = element_text(size = 5),
+        axis.title.y =  element_text(size = 5)) + 
+  scale_x_continuous(breaks=seq(0, 1, 0.5)) + 
+  scale_y_continuous(breaks=seq(0, 1, 0.5)) 
+
+g8 <- g8 +  annotate("text", x=0.75, y=0.25, label=paste("AUC =", round((calc_auc(g8))$AUC, 2)),size=2)
+
+g9 <- ggplot(resultsnb$pred,aes(m=yes, d=factor(obs, levels = c("no", "yes")))) + 
+  geom_roc(n.cuts=0) + 
+  coord_equal() +
+  style_roc()+
+  labs(title='naive bayes')+
+  theme(plot.title=element_text(face="bold",size=5,hjust = 0.5),
+        axis.title.x = element_text(size = 5),
+        axis.title.y =  element_text(size = 5)) + 
+  scale_x_continuous(breaks=seq(0, 1, 0.5)) + 
+  scale_y_continuous(breaks=seq(0, 1, 0.5)) 
+
+g9 <- g9 +  annotate("text", x=0.75, y=0.25, label=paste("AUC =", round((calc_auc(g8))$AUC, 2)),size=2)
 ```
 
+```{r 13,results='asis',warning=FALSE,message=FALSE,error=FALSE}
+multiplot(g1,g2,g3,g7,g8,g9,cols=3)
+#第四張圖是使用Oversampling，會將少類的觀測值隨機重複，train data多類樣本的數目為28256，故也將少類的資料筆數重複讀直到相同筆數。（此方法缺陷為過度擬合，會過度放大少類噪音的影響）第五張圖是使用Undersampling中的Random，隨機刪除多類的數據直到多類跟少類相同為止。（缺點可能刪去太多重要資訊）第六張圖是使用Oversampling與Undersampling兩種方法合併，少類Oversampling，多類Undersampling
+```
+
+# 結論
+
+```{r,results='asis'}
+ctree$table %>% kable()
+ctree$byClass %>% kable()
+```
+
+#### VIMP{-}
+
+概念：利用特徵經過置換前與置換後的誤差影響，來衡量該特徵的重要性。
+
+步驟：
+
+1. 利用每棵樹的分類模型來預測自己的OOB樣本，並計算錯誤率。
+
+  * OOB：在建構每棵樹的時候，我們對訓練集使用了不同的bootstrap sample。所以對於每棵樹而言，大约有1/3的資料點是沒有參與該棵樹的生成，他們就是該棵樹的OOB样本。
+
+2. 對想了解該特徵重要性的特徵進行隨機打亂，例如：把各資料點的「酒精濃度」進行隨機打亂。
+
+3. 利用原隨機森林模型進行預測得到新的outcome。
+
+4. 計算每棵樹新的OOB樣本錯誤率。
+
+5. 對於每棵樹擾亂特徵前後所得到的錯誤率相減並平均。
+
+6. 得出因該特徵擾亂後而導致的平均誤差上升多少，越高代表該變數越重要。
+
+
+
+# 參考文獻
+
+[1]吳東陽,2018大學雙二一退學與學生行為,https://hdl.handle.net/11296/4r7h7t
+
+[2]鄭媛文,2013,同儕教導學習策略對學生學習成就與情意態度 影響之後設分析,http://ntcuir.ntcu.edu.tw/bitstream/987654321/8086/2/8.pdf
+
+[3]http://www.edtung.com/TopNews/NewsContent.aspx?no=2250
+
+[4]http://www.ettoday.net/news/20121119/129267.htm
+
+Tinto, V. Limits of theory and practice in student attrition, Journal of Higher Education 53, p. 687-700, 1982. 
+
+Alaa El-Halees, Mining Students Data to Analyze Learning Behavior: A Case Study, 2008.
+
+Jiawei Han ,Micheline Kamber, Data Mining: Concepts and Techniques, 2nd edition, 2006.
+
+S. KOTSIANTIS,C. PIERRAKEAS,P. PINTELAS,PREDICTING STUDENTS'PERFORMANCE IN DISTANCE LEARNING USING MACHINE LEARNING TECHNIQUES ,Applied Artificial Intelligence, 18:411􏰀426, 2004 
+
+Schaffer, C. 1994. A conservation law for generalization performance. In Proceedings of the Eleventh 
+International Conference on Machine Learning, Pages 153􏰀178, New Brunswick, USA, July 10􏰀13. 
+
+Ghadeer S. Abu-Oda and Alaa M. El-Halees,DATA MINING IN HIGHER EDUCATION : UNIVERSITY STUDENT DROPOUT CASE STUDY ,International Journal of Data Mining & Knowledge Management Process (IJDKP) Vol.5, No.1, January 2015 
+
+[1]P. Baepler and C. J. Murdoch, "Academic Analytics and Data Mining in Higher Education," International Journal for the Scholarship of Teaching and Learning, vol. 4, no. 2, pp. 1-9, 2010. 
+
+[2] U. M. Fayyad, G. Piatetsky-Shapiro, P. Smyth and R. Uthurusamy, "Advances in knowledge discovery and data mining," 1996. 
+
+[3] R. S. J. D. Baker and K. Yacef, "The State of Educational Data Mining in 2009 : A Review and Future Visions," Journal of Educational Data Mining, vol. 1, no. 1, pp. 3-16, 2009.
+
+[4] A. AL-Malaise, A. Malibari and M. Alkhozae, "STUDENTS’ PERFORMANCE PREDICTION
+SYSTEM USING MULTI AGENT DATA MINING TECHNIQUE," International Journal of Data
+Mining & Knowledge Management Process (IJDKP) , vol. 4, 2014. 
+
+[8] B. Baradwaj and S. Pal, "Mining educational data to analyze student's performance," Internation Journal od Advamced Computer Science and Applications, vol. 2, no. 6, pp. 63-69, 2012.
+
+Gerben W. Dekker1, Mykola Pechenizkiy2 and Jan M. Vleeshouwers1,Predicting Students Drop Out: A Case Study ,International Conference on Educational Data Mining (EDM) (2nd, Cordoba, Spain, Jul 1-3, 2009)
+
+B. Baradwaj and S. Pal, "Mining educational data to analyze student's performance," Internation Journal od Advamced Computer Science and Applications, vol. 2, no. 6, pp. 63-69, 2012. 
+
+Cortez, P., & Silva, A. (2008). Using data mining to predict secondary school student performanc
+
+Kotsiantis S.; Pierrakeas C.; and Pintelas P., Predicting Students’ Performance in Distance Learning Using Machine Learning Techniques. Applied Artificial Intelligence (AAI), 18, no. 5, 411–426,2004.
+
+Pyke, S. W., & Sheridan, P. M. (1993). Logistic regression analysis of graduate student retention.Canadian Journal of Higher Education,23, 44–64.
+
+Fletcher, J., and Stren, R. (1992). Discussion of the factors influencing time to completion in graduate programs: Student views. In C. Filteau (ed.), Graduate Graduation Rates and Time to Completion: Colloquium Proceedings (pp. 17±48). Toronto: Council of Ontario Universities.
+
+Andrew P Bradle（1997）,Pattern Recognition, 30(7), pp. 1145-1159.
+
+
+Nitesh V. Chawla,Kevin W. Bowyer,Lawrence O. Hall,W. Philip Kegelmeyer,SMOTE: Synthetic Minority Over-sampling Technique,Journal of Artificial Intelligence Research 16 (2002) 321–357
+
+Breiman, L., Friedman, J.H., Olshen, R.A., and Stone, C.J. (1984) Classification and
+Regression Trees, Wadsworth, Belmont, CA. Republished by CRC Press.
+ 
+
+林士翔,2008,營造業違約邊界之研究
+
+
+Breiman, L. (2001). Random Forests. Machine learning, 45(1), 5-32.
+
+[9]Hoerl A.E. and Kennard. R.W. Ridge regression: Biased estimation for nonorthogonal problems. Technometrics, 12(3):55-67, 1970.
 
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+）
 
 
 
