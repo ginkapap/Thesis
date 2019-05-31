@@ -854,7 +854,7 @@ ctrl <- trainControl(method="cv",
                      savePredictions = T,
                      number = 10)
 ```
-```{r,results='asis',warning=FALSE,message=FALSE}
+```{r,warning=FALSE,message=FALSE}
 results1 = train(是否被二一~., 
                      data=train1_1, 
                      trControl = ctrl,
@@ -896,25 +896,28 @@ results6 = train(是否被二一~.,
                      family=binomial(),
                      metric = "ROC")
 
+rf_opts = data.frame(mtry=c(2:18))
+
 resultsrf = train(是否被二一~., 
                      data=mysmote, 
                      trControl = ctrl,
                      method='rf',
+                     tuneGrid = rf_opts,
                      metric = "ROC")
 
 resultssvm = train(是否被二一~., 
                      data=mysmote, 
                      trControl = ctrl,
-                     method='svmLinear2',
+                     method='svmRadial',
                      metric = "ROC")
 
-resultsnb = train(是否被二一~., 
+resultsnnet = train(是否被二一~., 
                      data=mysmote, 
                      trControl = ctrl,
-                     method='nb',
+                     method='nnet',
                      metric = "ROC")
 ```
-```{r,results='asis'}
+```{r}
 preds1 = predict(results1, test1_1)
 preds2 = predict(results2, test2_1)
 preds3 = predict(results3, test3_1)
@@ -923,7 +926,7 @@ preds5 = predict(results5, test3_1)
 preds6 = predict(results6, test3_1)
 predsrf = predict(resultsrf,test3_1)
 predsvm = predict(resultssvm,test3_1)
-prednb = predict(resultsnb,test3_1)
+prednnet = predict(resultsnnet,test3_1)
 c1<- confusionMatrix(table(preds1, good_observed1_1),positive = 'yes')
 c2 <- confusionMatrix(table(preds2, good_observed2_1),positive = 'yes')
 c3 <- confusionMatrix(table(preds3, good_observed3_1),positive = 'yes')
@@ -932,7 +935,7 @@ c5 <- confusionMatrix(table(preds5, good_observed3_1),positive = 'yes')
 c6 <- confusionMatrix(table(preds6, good_observed3_1),positive = 'yes')
 ctree <- confusionMatrix(table(predsrf, good_observed3_1),positive = 'yes')
 csvm <- confusionMatrix(table(predsvm, good_observed3_1),positive = 'yes')
-cnb <- confusionMatrix(table(prednb, good_observed3_1),positive = 'yes')
+cnnet <- confusionMatrix(table(prednnet, good_observed3_1),positive = 'yes')
 ```
 
 
@@ -945,23 +948,23 @@ cnb <- confusionMatrix(table(prednb, good_observed3_1),positive = 'yes')
 ## 研究背景
 
 現今國內外大學普遍存有督促學生學習狀況的機制，主要是以學生的在校成績作為其衡量標準，校方對於未達到標準的學生會進行懲罰的措施，旨在希望學生不要荒廢課業。
-大學退學可分為「自退」與「勒令退學」，自退為學生主動於校方申請退學，而勒令退學則屬校方強迫退學，按學校規定勒令退學將分為「非因成績退學」，以及「因成績退學」，早期之因成績退學制度普遍為「二一退學」，及實拿學分不及學期總學分二分之一便退學，然而教育部開放大學自主之後，陸續有許多學校對於退學標準做出調整，退學制度較為主流的為下列三者；較為嚴格的「三二退學」及實拿學分不及學期總學分三分之二便退學，較為寬鬆的「連續雙二一退學」即在校期間連續被二一兩次才會被退學，最後一項為「雙二一退學」，亦即在校期間累積被二一兩次才會退學，[3]交通大學註冊組組長彭淑嬌指出，十幾年前教育部開放給大學自主時，曾有一波廢除二一制度的聲浪，當時交大也因此廢除「單二一退學制度」，但後遺症很明顯，學生學習動力大幅減弱，校方只好又改採雙二一制度，雖近期陸續有學校開始廢除因成績退學制度，但目前大多數之大學仍保有著因成績退學機制；[1]研究也指出二一制度仍然對於學生可以有效達到嚇阻的功用，學生在被二一後的不及格學分比例在往後的學期會有所改善，故學生是否被二一仍是一個很好的學習成效指標。
+大學退學可分為「自退」與「勒令退學」，自退為學生主動於校方申請退學，而勒令退學則屬校方強迫退學，按學校規定勒令退學將分為「非因成績退學」，以及「因成績退學」，早期之因成績退學制度普遍為「二一退學」，及實拿學分不及學期總學分二分之一便退學，然而教育部開放大學自主之後，陸續有許多學校對於退學標準做出調整，退學制度較為主流的為下列三者；較為嚴格的「三二退學」及實拿學分不及學期總學分三分之二便退學，較為寬鬆的「連續雙二一退學」即在校期間連續被二一兩次才會被退學，最後一項為「雙二一退學」，亦即在校期間累積被二一兩次才會退學，[1]交通大學註冊組組長彭淑嬌指出，十幾年前教育部開放給大學自主時，曾有一波廢除二一制度的聲浪，當時交大也因此廢除「單二一退學制度」，但後遺症很明顯，學生學習動力大幅減弱，校方只好又改採雙二一制度，雖近期陸續有學校開始廢除因成績退學制度，但目前大多數之大學仍保有著因成績退學機制；[2]研究也指出二一制度仍然對於學生可以有效達到嚇阻的功用，學生在被二一後的不及格學分比例在往後的學期會有所改善，故學生是否被二一仍是一個很好的學習成效指標。
 
 ## 研究動機與目的
 
-台灣社面臨少子化的趨勢，造成各級教育機構入學人數普遍下滑，教育部因應此趨勢於民國102年推動大學整併計畫，針對一縣市有兩所以上的公立大學且單一學校學生人數在一萬人以下的公立大學推動整併；私立大學學生人數於兩千人以內，則推動退場機制。[4]為維持學校的規模，各大院校愈來愈重視學生的退學問題；若能夠於早期預測出學生退學，以減少退學的比例，對於學生與學校將會是雙贏。
-鑑於校方於學期結束後才能提供學生是否被二一之資訊，及收到警訊時可能僅剩一次機會亦或已被退學，本文希望能夠透過模型在學期開始前便有效的預測該學期是否會被二一，於學期初期便能給予老師或是周遭同學訊號，發揮同儕之間的影響力共同關懷學習上遭遇困難的學生；[2]教師對於學生學習成效之認知、情意及技能部分有顯著的影響，可見教師在學生學習過程中扮演了息息相關的角色[2]根據研究結果顯示：同儕教導學習策略對學生的「學習成就」、「情意態度」均有正向的影響，透過同儕之間給予學習上的協助，可以提高學生整體的學習成效，減少未來學生被二一的人數。
+台灣社面臨少子化的趨勢，造成各級教育機構入學人數普遍下滑，教育部因應此趨勢於民國102年推動大學整併計畫，針對一縣市有兩所以上的公立大學且單一學校學生人數在一萬人以下的公立大學推動整併；私立大學學生人數於兩千人以內，則推動退場機制。[3]為維持學校的規模，各大院校愈來愈重視學生的退學問題；若能夠於早期預測出學生退學，以減少退學的比例，對於學生與學校將會是雙贏。
+鑑於校方於學期結束後才能提供學生是否被二一之資訊，及收到警訊時可能僅剩一次機會亦或已被退學，本文希望能夠透過模型在學期開始前便有效的預測該學期是否會被二一，於學期初期便能給予老師或是周遭同學訊號，發揮同儕之間的影響力共同關懷學習上遭遇困難的學生；鄭媛文（2013）教師對於學生學習成效之認知、情意及技能部分有顯著的影響，可見教師在學生學習過程中扮演了息息相關的角色，根據研究結果顯示：同儕教導學習策略對學生的「學習成就」、「情意態度」均有正向的影響，透過同儕之間給予學習上的協助，可以提高學生整體的學習成效，減少未來學生被二一的人數。
 
 # 文獻回顧
 
-目前學術表現的解釋和預測的主題被廣泛研究，在早期的研究中Tinto模型（1982）是考慮學業成功因素的主要理論框架，Tinto將整個學生流失的過程視為學生特色與學院經驗之間的社會心理相互作用。
+目前學術表現的解釋和預測的主題被廣泛研究，在早期的研究中Tinto模型（1982）是考慮學業成功因素的主要理論框架，Tinto（1982）將整個學生流失的過程視為學生特色與學院經驗之間的社會心理相互作用。
 學生的過去與學術環境之間交互作用將導致學生融入這一新環境的程度，根據此交互作用，更高程度的教育整合與學生順利完成學習目標有著很大的關聯性。
 
 目前對於教育的資料探勘文獻比起金融、醫療領域中相對較少 Alaa and Halees（2008） ，將資料探勘運用於教育領域之中，可以提取並且評估影響學生學習的變量，以加強我們對於學習以及教育的理解，Han and Kamber（2006）將資料探勘運用於教育領域之中，又稱教育資料探勘，本文將資料探運應用於預測學生二一，達到強化學生對於學習的理解；目前國外文獻中將資料探勘應用於預測與教育相關的論文主要為預測學生的輟學行為。
 
-Kotsiantis,Pierrakeas and Pintelas（2004）對於與學生學習成效相關進行的預測，將機器學習應用於Hellenic Open University遠程教育預測中；預測出哪一類型學生輟學的可能性最高；使得遠端導師可以採取預防措施減少學生的輟學率，遠程學習是一種無需與教師在課堂上進行定期面對面上課的課程，其提到由於每個歸納學習算法都存有偏差，若某個算法在適當的領域中表現良好，很有可能在其他領域表現不佳 (Schaffer 1994)故必須對各個算法做出比較，研究中提出了六種模型，其中Naive Bayes 演算法表現最佳其平均預測準確率達至70.51%。
+Kotsiantis,Pierrakeas and Pintelas（2004）對於與學生學習成效相關進行的預測，將機器學習應用於Hellenic Open University遠程教育預測中；預測出哪一類型學生輟學的可能性最高；使得遠端導師可以採取預防措施減少學生的輟學率，遠程學習是一種無需與教師在課堂上進行定期面對面上課的課程，其提到由於每個歸納學習算法都存有偏差，若某個算法在適當的領域中表現良好，很有可能在其他領域表現不佳 （Schaffer 1994）故必須對各個算法做出比較，研究中提出了六種模型，其中Naive Bayes 演算法表現最佳其平均預測準確率達至70.51%。
 
-Abu-Oda and El-Halees（2015）表示目前高等教育遭遇許多問題，導致教育機構逐步遠離了實現重視教育質量的目標，[1]大多數的原因來自於校方與學生之間的資訊落差；校方無法獲得足夠多的信息來為學生提供合適的教育，[2]數據挖掘是一種功能強大的技術，可以萃取出具有價值的知識和信息，通過數據挖掘技術可以透過預測學生的類型，使高等教育機構能夠以個別化的方式做出更好的決策，教育學生時採用更進步的計劃，並使教育機構能夠更有效地分配資源和人力[3][4]，Abu-Oda,El-Halees（2015）運用了ALAQSA 大學 計算機科學系的成績單與高中成績預測輟學的學生，預測學生是否輟學；研究中使用了決策樹模型以及Naive Bayes模型進行預測，並分別得出98.14%與96.86%兩者極高的準確度。
+Abu-Oda and El-Halees（2015）表示目前高等教育遭遇許多問題，導致教育機構逐步遠離了實現重視教育質量的目標，Baepler and Murdoch（2010）大多數的原因來自於校方與學生之間的資訊落差；校方無法獲得足夠多的信息來為學生提供合適的教育，Fayyad, Piatetsky-Shapiro（1996）數據挖掘是一種功能強大的技術，可以萃取出具有價值的知識和信息，Baker and Yacef（2009）通過數據挖掘技術可以透過預測學生的類型，使高等教育機構能夠以個別化的方式做出更好的決策，教育學生時採用更進步的計劃，並使教育機構能夠更有效地分配資源和人力，Abu-Oda,El-Halees（2015）運用了ALAQSA 大學 計算機科學系的成績單與高中成績預測輟學的學生，預測學生是否輟學；研究中使用了決策樹模型以及Naive Bayes模型進行預測，並分別得出98.14%與96.86%兩者極高的準確度。
 
 在Dekker,Pechenizkiy and Vleeshouwers（2009）研究中提到輟學學生中有一類型的學生為風險類學生，此類型學生特點為有機率不被退學的學生；但是校方必須提供更多的資源於他們身上，他們才能免於被退學，研究中透過高中以及大學的成績資料建構決策樹模型提前預測出此類型的學生準確度高達75%至80%之間，這項研究將有助於學生與老師共同改善學生的成績表現，使得校方可以降低學生的輟學比例。
 
@@ -1000,7 +1003,7 @@ ggplot(py$dfpic2_1, aes(x = 入學年, fill = 二一)) +
 
 #### 累積二一
 
-觀察學生的累積二一狀況，圖3之橫軸為年級以及學期，11表示一年級第一學期，以此類推，圖為被二一的學生當中，累積至當期前的二一狀況，顯示一年級被二一的人數是最多的，其反映了這些被二一的學生之中，有很大的比例是不適應初上大學後的教學，而另外一處高峰位於大四，這裡隱含兩種可能；第一種為大四課比較少所以若有幾門課被當便會造成二一及途中橘色的部分；第二種為另一半剩下的部分，這些人都是曾經有被二一過而到大四又再度被二一的人；可知被二一過的同學大四時有很大的機率會延續之前的學習狀態導致大四被二一，通過初步的觀察跡象我們將加入此變數「曾被二一過次數」當作解釋變數，以預測同學未來是否會被二一。
+觀察學生的累積二一狀況，圖3之橫軸為年級以及學期，11表示一年級第一學期，以此類推，圖為被二一的學生當中，累積至當期前的二一狀況，顯示一年級被二一的人數是最多的，其反映了這些被二一的學生之中，有很大的比例是不適應初上大學後的教學，而另外一處高峰位於大四，這裡隱含兩種可能；第一種為大四課比較少所以若有幾門課被當便會造成二一及途中橘色的部分；第二種為另一半剩下的部分，這些人都是曾經有被二一過而到大四又再度被二一的人；可知被二一過的同學大四時有很大的機率會延續之前的學習狀態導致大四被二一，通過初步的觀察跡象我們將加入此變數「累積二一」當作解釋變數，以預測同學未來是否會被二一。
 
 ```{r 3, results="asis" }
 ggplot(py$dfpic3_1, aes(x = 年級,fill = 累積二一)) +  
@@ -1008,9 +1011,9 @@ ggplot(py$dfpic3_1, aes(x = 年級,fill = 累積二一)) +
   labs(x='年級',y = "累積二一",size=10)+ scale_fill_discrete(name='累積二一次數')
 ```
 
-#### 累計被當比
+#### 累積被當比
 
-成績單資料中提供最主要的訊息為學生的學習狀況，由上節分析可以得知被二一過的學生再度被二一的比例很高，代表學生在學習上初期問題會一直困擾著學生，本文以學生歷年來的修課狀況與紀錄來建構學生的學習情況，變數分別為；累計專業必修被當比例、累計共同必修被當比例、累計其他必修被當比例、累計選修被當比例以及累計通識被當比例作為捕捉修課面向的特徵，選擇比例而非堂數的原因為每人的修課數會受到系級的不同、個人是否雙主修、輔修、教育學程或是不同入學年所影響。
+成績單資料中提供最主要的訊息為學生的學習狀況，由上節分析可以得知被二一過的學生再度被二一的比例很高，代表學生在學習上初期問題會一直困擾著學生，本文以學生歷年來的修課狀況與紀錄來建構學生的學習情況，變數分別為；累積專業必修被當比例、累積共同必修被當比例、累積其他必修被當比例、累積選修被當比例以及累積通識被當比例作為捕捉修課面向的特徵，選擇比例而非堂數的原因為每人的修課數會受到系級的不同、個人是否雙主修、輔修、教育學程或是不同入學年所影響。
 
 本文依照不同的必修特性將必修分為三種類型討論，第一類為專業必修，專業必修定義為班上超過五成人所修習之必修，此專業必修的定義較接近為系上的必修科目，因於成績單之必選修類別（必／選／通）欄位會受到學生雙主修、輔修以及修習教育學程的影響，而將非本系之科目列為以上這類同學的必修課，故無法從成績單上反應該系必修課對於學生的影響，將專業必修定義於此旨在排除這類特殊狀況的影響；第二類為全校共同必修，本校共同必修涵蓋體育、英文、英文聽講、軍訓以及國文，此類相對專業科目來說負擔較輕，若學生於此科目有著很高的被當比例可能代表著學生對於大學教育高度的不適應；第三類為其他類，及排除上兩類後剩下成績單中所顯示為必修的科目，及雙主修、輔修、教育學程同學所多出的科目。
 
@@ -1207,9 +1210,9 @@ ggcorr(py$dfpic99,geom="circle", size = 2,,method = c("everything", "pearson"))
 
 # 研究方法
 
-## logistic
+## 羅吉斯回歸
 
-羅吉斯回歸分析（Long 1997）將多元回歸分析技術擴展至解釋變數為類別變數，根據邏輯斯函數用於二元應變數分析的理論，係假設理論上存在代表事件發生可能性的連續反應變數 $y_i$ ，其值介於 $-\infty$ 至 $+\infty$ ，若該變數的值超過臨界值c 時，則導致事件發生，當 $y_i$ 比c大時，代表事件發生及 $y_i=1$ ；而當 $y_i$ 不比c大時則代表事件未發生及 $y_i=0$ 。
+由Long （1997）提出的羅吉斯回歸分析，將多元回歸分析技術擴展至解釋變數為類別變數，根據邏輯斯函數用於二元應變數分析的理論，係假設理論上存在代表事件發生可能性的連續反應變數 $y_i$ ，其值介於 $-\infty$ 至 $+\infty$ ，若該變數的值超過臨界值c 時，則導致事件發生，當 $y_i$ 比c大時，代表事件發生及 $y_i=1$ ；而當 $y_i$ 不比c大時則代表事件未發生及 $y_i=0$ 。
 
 本文所使用模型為：
 
@@ -1222,7 +1225,9 @@ $$
 
 其中 $\beta$ 為待估計參數 $\epsilon_{i}$ 為隨機誤差項， $Y_{i}^*$ 為一代表學生於大學教育適應程度之潛伏變數， $Y_{i}^*>0$ 代表不適應於大學教育，此變數無法直接得知，故利用可以觀察之變數 $Y_i$ 做為代理變數，其透過函數I轉換成 $Y_i$ ，定義當 $Y_i=1$ 時的機率如下：
 
-$Pr(Y=1|feature, X)= prob \left[epsilon_{i} > (\beta_0+\sum_{j=1}^{k}\beta_i X_{i,j})\right]\\= 1-F\left [-(\beta_0+\sum_{j=1}^{k}\beta_i X_{i,j})\right]\\=F\left[\beta_0+\sum_{j=1}^{k}\beta_i X_{i,j}\right]$
+$$
+Pr(Y=1|feature, X)= prob \left[epsilon_{i} > (\beta_0+\sum_{j=1}^{k}\beta_i X_{i,j})\right]\\= 1-F\left [-(\beta_0+\sum_{j=1}^{k}\beta_i X_{i,j})\right]\\=F\left[\beta_0+\sum_{j=1}^{k}\beta_i X_{i,j}\right]
+$$
 
 其中，F為 $\epsilon_{i}$ 的累積機率分配函數概似函數為：
 
@@ -1241,16 +1246,14 @@ $$
 
 ## 隨機森林
 
-介紹隨機森林之前，必須先介紹決策樹，決策樹是用來處理分類問題的樹狀結構，由Breiman,Friedman,Olshen,Stone於1984年所提出，CART（Classification and regression tree）演算法中擁有根、節、點、葉等結構如圖，每個樹上的節點皆為一次伯努力實驗，每個節點中CART會將資料分成兩種資料集，當每筆資料都在同一個類別或是當節點無法再找出新的類進行節點分隔時便會停止，步驟如圖：
+介紹隨機森林之前，必須先介紹決策樹，決策樹是用來處理分類問題的樹狀結構，由Breiman,Friedman,Olshen,Stone於1984年所提出，CART（Classification and regression tree）演算法中擁有根、節、點、葉等結構如圖，每個樹上的節點皆為一次伯努力實驗，每個節點中CART會將資料分成兩種資料集，當每筆資料都在同一個類別或是當節點無法再找出新的類進行節點分隔時便會停止，步驟如圖13：
 
 <img src= https://imgur.com/ZTC8yiM.jpg>
 
 CART在建構決策樹過程中，以吉尼獲利(Gini Gain)為準則，並選擇最大的吉尼獲利值作為分類屬性；Gini impurity 為一衡量資訊量的指標，越高代表其反映的資訊量越大，定義如下：
 
 $$
-
 Gini(S)=1−\sum_{n\in S}p_{i}^2
-
 $$
 
 n為資料集S中所包含的類別，p為某類占資料的比例。
@@ -1270,12 +1273,9 @@ $$
 由年級分裂成兩個節點，假設左節點為大一下至大三上，沒被二一以及被二一的人數分別為14657與157，右節點為大三下至大四下，沒被二一以及被二一的人數分別為15764與194，此時不純度的計算如下：
 
 $$
-
 i(Node_{left}) = 1- \left [(\frac {14657}{14814})^2 + (\frac {154}{14814})^2 \right] = 0.0209758 \\
-
 i(Node_{right}) = 1- \left [(\frac {15764
 }{15958})^2+(\frac {194}{15958})^2  \right] = 0.0240182 \\
-
 $$
 
 $$
@@ -1284,9 +1284,9 @@ $$
 
 此例中吉尼獲利為負，代表此分割後得到了更少的資訊，決策樹會依照各特徵中可以使得吉尼獲利最大的的特徵往下分裂。
 
-隨機森林由 Breiman Leo[2001]所提出，其基本原理為結合多棵CART樹，並加入隨機分配的訓練資料，以大幅增進最終的運算結果，此方法為Ensemble Method（集成方法）的一類，其想法為如果單個分類器表現不錯，那麼將多個分類器組合起來，其表現會優於單個分類器，建構模型的步驟為:
+隨機森林由 Breiman Leo（2001）所提出，其基本原理為結合多棵CART樹，並加入隨機分配的訓練資料，以大幅增進最終的運算結果，此方法為Ensemble Method（集成方法）的一類，其想法為如果單個分類器表現不錯，那麼將多個分類器組合起來，其表現會優於單個分類器，建構模型的步驟為:
 
-1. 決定隨幾森林中需要多少棵樹，個數推薦約64~128[9]，假設為K棵樹。
+1. 決定隨幾森林中需要多少棵樹，Hoerl A.E. and Kennard. R.W（1970）個數推薦約64~128，假設為K棵樹。
 
 2. 利用Bagging方式建造K棵決策樹，Bagging於1996年由Breiman提出（Bootstrap aggregating），此種方法會從訓練集中隨機抽取K個樣本集，並且取後放回，再從這K個樣本集中訓練出K棵數。
 
@@ -1294,45 +1294,92 @@ $$
 
 隨機森林的建構模型的方法是生成很多棵決策樹，由這些決策樹的結果去投票得出最終預測，其中這些決策樹必須有所差異，除了使用Bagging的方式讓K棵決策樹有所差異，在隨機森林的決策樹生成時，也可從總變數中隨機抽取q個變數來當作此樹的分割變數，造成樹之間的差異性。
 
-## Naive Bayes classifier
-
 ## 支持向量機
 
-支援向量機(Support Vector Machines；SVM)是由Vapnik在1995年所提出之方法，利用區分超平面(Separating
-Hyperplane) 來分隔資料中不同的類別，而SVM中又分為線性與非線性，SVM的基本概念為找到一個決策邊界(decision boundary)讓兩類之間的邊界(margins)最大化，使其可以完美區隔開來。
+支援向量機(Support Vector Machines；SVM)由 Vapnik 於 1995 年與 AT＆T 實驗室
+團隊所提出，其主要是利用區分超平面(Separating
+Hyperplane) 來分隔兩個或多個不同類別的資料，可分為處理線性可分問題與非線性分類[4,5]。
 
-以本文其中兩個特徵為例，分別為累積通識被當比與累積選修被當比分別簡稱為通識以及選修 ，假設有5組被二一以及5組沒被二一的資料分散於二維平面其中：
+### 線性可分
+
+二元分類訓練樣本為：
 
 $$
- x_i=\left[
- \begin{matrix}
-   通識 \\
-   選修
-  \end{matrix}
-  \right] \ ，y_i=
+(x_1,y1),(x2,y2),...,(x_n,y_n)
+\\x\in R^n \\  
+y_i=
   \left\{ \begin{array}{ll}
            +1 , if \ \ \ 被二一\\
            -1 , if \ \ \ 沒被二一   
         \end{array} \right.
-$$
+$$ 
+
+若訓練樣本可以被一個平面 $w^{\mathrm{T}}x_i + b =0$ 所分開，則此平面稱為區分超平面，落在區分超平面的所有 $x_i$ 必須滿足 $w^{\mathrm{T}}x_i + b =0$ ，其中ｗ為超平面之法向量，b為偏移量。圖15為兩區分超平面，原始訓練時僅有藍1與紅1，分類器的左側代表預測為藍，右側代表預測為紅，分類器訓練完畢後，出現新的一點紅new，此時margin較小的分類器會出現錯誤，可知margin越大之區分超平面，其分類效果越好。
+
+<img src = 'https://imgur.com/HyScivu.jpg'>
+
+$f(x)= wx+b$ 稱為決定函數，當輸入一筆資料時可依據決定函數的值來分類。若 $f(x)>0$ ，則將該筆資料歸類為+1，若 $f(x)<0$ 時就將該筆資料歸類於-1，支持向量機希望可以在被二一以及沒被二一兩類資料中，找出最大邊界(Margin)的區分超平面如下式：
 
 $$
-被二一 \ (y_i=1) \ 代表 \ w^{\mathrm{T}}x + b \geq 1 \\
-沒被二一 \ (y_i=-1) \ 代表 \ w^{\mathrm{T}}x + b < 1 \\
-整理為 \ y_i(w^{\mathrm{T}}x_i) + b < 1 ,\forall i = 1,2,...,n
+\begin{equation}
+\begin{split}
+&\text{maximize} \displaystyle\ margin(b,w) &\\
+&\text{subject to} \displaystyle\ & y_i(w^{\mathrm{T}}x_i+b) >0, i=1 ,...n\\
+&                                             &margin(b,w)=min\ distance(x_i,w),i=1,...n
+\end{split}
+\end{equation}
 $$
 
-SVM在找Optimal hyperplane就是希望區隔兩類之間的邊界(2/|w|)可以越大越好。
+經過推導，最後可將問題簡化為：
 
+$$
+\begin{equation}
+\begin{split}
+&\text{maximize} \displaystyle\ &\frac{1}{2}(w^{\mathrm{T}}w) &\\
+&\text{subject to} \displaystyle\ & y_i(w^{\mathrm{T}}x_i+b) \geq1, i=1 ,...n\\
+\end{split}
+\end{equation}
+$$
 
+經由推導得知建立最佳超平面的指示函數為:
 
+$$
+f(x)=sgn \left (\sum_{support\ vector}y_i\lambda _i\cdot(x_i\cdot x_j)+b\right)
+$$
+
+### 線性不可分
+
+現實世界中有許多的資料為線性不可分，Gunn（1998）
+針對非線性函數的問題做了處理，將原始資料透過非線性的映射函數Ｋ轉換到另外一個較高維度的特徵空間執行線性分類，可以獲得更好的分類效果，Vapnik（1998）提出建造某特徵空間的最佳分類超平面時，可以針對指是函數進行內積迴旋，內積迴旋的基本概念為，在原空間以核函數進行內積運算以代替在較高維度空間的內積運算，其指示函數如下，其中K為核函數
+
+$$
+f(x)=sgn \left (\sum_{support\ vector}y_i\lambda _i\cdot K(x_i\cdot x_j)+b\right)
+$$
+
+本文所使用之核函數為Radial Basis Function kernel function $K(x_i,x_j)=exp(-\gamma ||x_i-x_j||^2)$ ，C為懲罰項係數及對誤差的寬容度，C越小越可以容忍誤差代表模型越容易欠缺擬合，而C越大則會出現過度擬合的問題導致模型不過一般化， $\gamma$ 主要是決定數據映射到新的特徵空間後的分佈， $\gamma$ 越大，非線性效能越小，對噪音越不敏感，反之則越敏感，Hsu, Chang & Lin（2003）因放射型函數對於分類非線性以及高維度的資料有很好的效果是選擇核心函數的優先選擇。
+
+$$
+f(x)=sgn \left (\sum_{support\ vector}y_i\lambda _i\left[exp\left(-\frac{||x_i-x_j||^2 }{\gamma}\right)\right]+b\right)
+$$
+
+## 人工神經網路(ArtificialNeuralNetwork)
+
+人工神經網路(ArtificialNeuralNetwork)又稱為類神經網絡路，式最早由 Warren McCulloch 及 Walter Pitts （1943）提出基於數學及邏輯的演算法，後由David E. Rumelhart 及 James McClelland（1986）提出倒傳遞類神經網路(Back-propagation Network , BPN)，創造出類似大腦神經傳遞的模型，其設計思想為模擬生物的神經傳導機制，由許多神經元連結進行平行分散式的計算，電腦利用大量的數值資料，經由如大腦般不斷地學習與收斂，調整神經元之間的權重值，每顆神經元裡都存有激活函數(下式)，本文所使用之激活函數為logistic，其函數可以將一個實數映射到(0, 1)的區間中，以用來作為二元分類。
+
+$$
+f(net_i) = f(\sum_i w_{ij}x_i - \theta_i) 
+$$
+
+$w_{ij}$ 為類神經網路處理理單元間的連結權重值， $x_i$ 為輸入值，$\theta_i$ 為神經元的 門檻值。
+
+倒傳遞類神經網路學習演算法中主要的學習過程為從樣本中學習以及不斷的調整網路連結權重值的過程；其中分為兩部份，第一部分為向前傳遞；另一部分為向後傳遞，步驟為輸入層輸入資料向前傳遞，經權重處理後經過隱藏層，再經一個激活函數得到輸出值，如下圖，最後將輸出值與真實值帶入代價函數(Cost function)中，並極小化代價函數 $J=-y * log×(\hat{y}) − (1−y)×log(1−\hat{y})$ ，反向傳遞的部分為利用梯度下降法調整權重。經由不斷反覆向前以及向後傳遞的過程反覆訓練，直至產生一組最佳的權重值 $w_{ij}$ 。
+
+<img src = https://imgur.com/13qRWcV.jpg>
 
 ## 資料集
 
 本文將資料分割成兩個資料集，訓練集以及測試集分別佔總資料70%與30%，測試集僅於最後選定模型之後套入模型使用，訓練集主要為訓練分類器；並透過10疊交叉驗證集來訓練超參數。
-參數與超參數的區別為，參數是指選定的機器學習技術中用來調整資料的變數；如羅吉斯回歸中的權重 $\beta_i$ ，超參數與訓練資料沒有直接關聯屬於設定變數，參數在訓練時會不斷修正而超參數並不會改變；如隨機森林中的K棵樹的選定以及隨機抽取q個特徵，而如何得到更好得超參數一個方法為運用驗證集來調整，
-
-
+參數與超參數的區別為，參數是指選定的機器學習技術中用來調整資料的變數；如本文所使用支持向量機中的 $w_i$ ，超參數與訓練資料沒有直接關聯屬於設定變數，參數在訓練時會不斷修正而超參數並不會改變；如本文所使用支持向量機中的 $C,\gamma$ ，而如何得到更好得超參數一個方法為運用驗證集來調整，由訓練集訓練不同的超參數得出模型後再丟入驗證集做驗證，藉此來調整超參數。
 
 ## SMOTE
 
@@ -1355,8 +1402,9 @@ $$ s'= \lambda s+(1−\lambda)r,\lambda \in (0,1) $$
 $$
 \frac{True Positive + True Negative}{True Positive + True Negative + False Positive +False Negative}
 $$
+
 以下將分別簡稱True Positive、True Negative、False Positive、False Negative為TP、TN、FP、FN
-當資料為不平衡資料時，如本文資料中沒被二一類的資料遠高於被二一類，及Positive類少，分類器如將全部的資料都遇測為沒被二一類（Negative），則TN數值會很高，其準確度仍可以達到很高，故本文分類器驗證指標利用受試者操作特性曲線 (Receiver Operating Characteristic，ROC)來作為評價標準。
+當資料為不平衡資料時，如本文資料中沒被二一類的資料遠高於被二一類，及Positive類少，分類器如將全部的資料都遇測為沒被二一類（Negative），則TN數值會很高，其準確度仍可以達到很高，故本文分類器驗證指標利用受試者操作特性曲線（Receiver Operating Characteristic，ROC）來作為評價標準。
 
 <img src= https://imgur.com/6Kkkinq.jpg>
 
@@ -1368,7 +1416,7 @@ $$
 
 ROC曲線提供了一個方便觀察模型優劣的方法，觀察ROC曲線圖的幾個點；若為（0,0）則代表該分類器預測所有樣本皆為負例，（1,1）則全數預測為正例，（0,1）則是將所有樣本都正確分類，（1,0）則為全樣本都錯誤分類，所以ROC曲線若能向左上角靠則代表此分類器擁有越好的分類效果， ，當一個模型的預測能力完美時，ROC曲線會在左方與縱軸貼齊，上方與橫軸貼齊；ROC曲線越往左上則代表分類效果越好，而當ROC曲線貼合於對角線則代表此模型為隨機模型，即此模型沒有任何預測能力，若當ROC曲線之間出現交錯或難以觀察的狀況時，可藉由ROC曲線下的面積AUC（Area Under Curve）來評定分類器的好壞，及ROC曲線下的面積占整體橫縱軸所行程之四方形面積的比例，若為1代表完美模型，0.5則代表此模型毫無預測能力，一般模型此值皆介於0.5至1之間，若於0.5以下則代表該分類器具有相反的分類效果。
 
-# 模型結果
+# 研究結果
 
 ```{r,warning=FALSE,message=FALSE,error=FALSE}
 g1 <- ggplot(results1$pred, aes(m=yes, d=factor(obs, levels = c("no", "yes")))) + 
@@ -1469,7 +1517,7 @@ g8 <- ggplot(resultssvm$pred,aes(m=yes, d=factor(obs, levels = c("no", "yes"))))
 
 g8 <- g8 +  annotate("text", x=0.75, y=0.25, label=paste("AUC =", round((calc_auc(g8))$AUC, 2)),size=2)
 
-g9 <- ggplot(resultsnb$pred,aes(m=yes, d=factor(obs, levels = c("no", "yes")))) + 
+g9 <- ggplot(resultsnnet$pred,aes(m=yes, d=factor(obs, levels = c("no", "yes")))) + 
   geom_roc(n.cuts=0) + 
   coord_equal() +
   style_roc()+
@@ -1484,30 +1532,32 @@ g9 <- g9 +  annotate("text", x=0.75, y=0.25, label=paste("AUC =", round((calc_au
 ```
 
 ```{r 13,results='asis',warning=FALSE,message=FALSE,error=FALSE}
-multiplot(g1,g2,g3,g7,g8,g9,cols=3)
+multiplot(g3,g7,g8,g9,cols=2)
 #第四張圖是使用Oversampling，會將少類的觀測值隨機重複，train data多類樣本的數目為28256，故也將少類的資料筆數重複讀直到相同筆數。（此方法缺陷為過度擬合，會過度放大少類噪音的影響）第五張圖是使用Undersampling中的Random，隨機刪除多類的數據直到多類跟少類相同為止。（缺點可能刪去太多重要資訊）第六張圖是使用Oversampling與Undersampling兩種方法合併，少類Oversampling，多類Undersampling
 ```
 
-# 結論
+分別比較四個模型的AUC，發現隨機森林的AUC高達0.95故將使用隨機森林模型對測試集資料進行預測，並觀察結果，結果如下表，誤查率為1-Specificity，僅有0.159139，因是不平衡資料，所以準確度應看Balanced Accuracy 及 $\frac{(\frac{TP}{TP+FN}+\frac{TN}{TN+FP})}{2}$ ，其值為0.8589091，召回率也有高達0.8734177，代表實際被二一的同學中模型可以預測出被二一的比例高達87%，綜合以上本模型在於預測學生被二一有著很好的預測效果。
 
 ```{r,results='asis'}
 ctree$table %>% kable()
-ctree$byClass %>% kable()
+#ctree$byClass %>% kable()
 ```
 
-#### VIMP{-}
+# 結論與建議
 
-概念：利用特徵經過置換前與置換後的誤差影響，來衡量該特徵的重要性。
+## 結論
 
-步驟：
+得知隨機森林為以上幾個中最好的分類器後，藉由利用特徵經過置換前與置換後的誤差影響，來衡量該特徵的重要性。
+
+其步驟如下：
 
 1. 利用每棵樹的分類模型來預測自己的OOB樣本，並計算錯誤率。
 
   * OOB：在建構每棵樹的時候，我們對訓練集使用了不同的bootstrap sample。所以對於每棵樹而言，大约有1/3的資料點是沒有參與該棵樹的生成，他們就是該棵樹的OOB样本。
 
-2. 對想了解該特徵重要性的特徵進行隨機打亂，例如：把各資料點的「酒精濃度」進行隨機打亂。
+2. 對想了解該特徵重要性的特徵進行隨機打亂。
 
-3. 利用原隨機森林模型進行預測得到新的outcome。
+3. 利用原隨機森林模型進行預測得到新的出向。
 
 4. 計算每棵樹新的OOB樣本錯誤率。
 
@@ -1515,82 +1565,103 @@ ctree$byClass %>% kable()
 
 6. 得出因該特徵擾亂後而導致的平均誤差上升多少，越高代表該變數越重要。
 
+結果如下圖所示，觀察前五個變數，累積專業必修pr、累積專業必修被當比佔據了前兩名；最為重要，說明專業必修對於學生是否會被二一的影響程度最大，故教師在未來可以以此為側重重點，加強學生在專業必修的學習，而累積選修pr與累積通識pr與累積選修被當比重要的程度也在前五以內，這代表了不僅是專業必修、選修以及通識對於學生在未來被二一也佔有一定重要程度，故如何提出一個完善的措施來提升專業必修、選修以及通識課程的表現，是老師與學生必須一起解決的重要課題。
 
+```{r,results='asis',message=FALSE,error=FALSE,warning=FALSE}
+qq<- varImp(resultsrf)
+library(mlbench)
+library(tidyverse)
+varImp(resultsrf)$importance %>% 
+  as.data.frame() %>%
+  rownames_to_column() %>%
+  arrange(Overall) %>%
+  mutate(rowname = forcats::fct_inorder(rowname )) %>%
+  ggplot()+
+    geom_col(aes(x = rowname, y = Overall))+
+    coord_flip()+
+    theme_bw()
+```
+
+
+## 建議
+
+本文所利用成績單資料預測學生於未來時是否會被二一之表現雖得到不錯的效果，但許多時候學生是否會被二一也會由學生之心理狀況、學生出生背景；如父母職業，是否為明星高中，出生地人口密集程度，以及學生大學前成績表現等狀況影響，故若未來想增強預測能力除了可利用大學時期的成績資料外，亦可藉由此方向著手。
 
 # 參考文獻
 
-[1]吳東陽,2018大學雙二一退學與學生行為,https://hdl.handle.net/11296/4r7h7t
+林士翔,2008,營造業違約邊界之研究
 
-[2]鄭媛文,2013,同儕教導學習策略對學生學習成就與情意態度 影響之後設分析,http://ntcuir.ntcu.edu.tw/bitstream/987654321/8086/2/8.pdf
+鄭媛文,2013,同儕教導學習策略對學生學習成就與情意態度影響之後設分析
 
-[3]http://www.edtung.com/TopNews/NewsContent.aspx?no=2250
+[1]http://www.edtung.com/TopNews/NewsContent.aspx?no=2250
 
-[4]http://www.ettoday.net/news/20121119/129267.htm
+[2]吳東陽,2018,大學雙二一退學與學生行為
+
+[3]http://www.ettoday.net/news/20121119/129267.htm
+
+[4].C. J. C. Burges, “A tutorial on support vector machines for pattern recognition”, Data Mining and Knowledge Discovery, vol. 2, no. 2, pp.955-974 , 1998.
+
+[5]. Schőlkopf, C. J. C. Burges & A. J. Smola, “Introduction to support vector
+learning, advances in kernel methods-support vector learning,” Cambridge, MA, pp. 1-15,  1999.
 
 Tinto, V. Limits of theory and practice in student attrition, Journal of Higher Education 53, p. 687-700, 1982. 
 
 Alaa El-Halees, Mining Students Data to Analyze Learning Behavior: A Case Study, 2008.
 
-Jiawei Han ,Micheline Kamber, Data Mining: Concepts and Techniques, 2nd edition, 2006.
+Jiawei Han , Micheline Kamber, Data Mining: Concepts and Techniques, 2nd edition, 2006.
 
-S. KOTSIANTIS,C. PIERRAKEAS,P. PINTELAS,PREDICTING STUDENTS'PERFORMANCE IN DISTANCE LEARNING USING MACHINE LEARNING TECHNIQUES ,Applied Artificial Intelligence, 18:411􏰀426, 2004 
+S. KOTSIANTIS,C. PIERRAKEAS,P. PINTELAS, PREDICTING STUDENTS'PERFORMANCE IN DISTANCE LEARNING USING MACHINE LEARNING TECHNIQUES ,Applied Artificial Intelligence, 18:411-426, 2004.
 
-Schaffer, C. 1994. A conservation law for generalization performance. In Proceedings of the Eleventh 
-International Conference on Machine Learning, Pages 153􏰀178, New Brunswick, USA, July 10􏰀13. 
+Schaffer,C., A conservation law for generalization performance. In Proceedings of the Eleventh International Conference on Machine Learning, Pages 153-178, New Brunswick, USA, July 10-13, 1994.
 
-Ghadeer S. Abu-Oda and Alaa M. El-Halees,DATA MINING IN HIGHER EDUCATION : UNIVERSITY STUDENT DROPOUT CASE STUDY ,International Journal of Data Mining & Knowledge Management Process (IJDKP) Vol.5, No.1, January 2015 
+Ghadeer S. Abu-Oda and Alaa M. El-Halees, DATA MINING IN HIGHER EDUCATION : UNIVERSITY STUDENT DROPOUT CASE STUDY ,International Journal of Data Mining & Knowledge Management Process (IJDKP) Vol.5, No.1, January 2015 .
 
-[1]P. Baepler and C. J. Murdoch, "Academic Analytics and Data Mining in Higher Education," International Journal for the Scholarship of Teaching and Learning, vol. 4, no. 2, pp. 1-9, 2010. 
+P. Baepler and C. J. Murdoch, "Academic Analytics and Data Mining in Higher Education," International Journal for the Scholarship of Teaching and Learning, vol. 4, no. 2, pp. 1-9, 2010. 
 
-[2] U. M. Fayyad, G. Piatetsky-Shapiro, P. Smyth and R. Uthurusamy, "Advances in knowledge discovery and data mining," 1996. 
+U. M. Fayyad, G. Piatetsky-Shapiro, P. Smyth and R. Uthurusamy, "Advances in knowledge discovery and data mining," 1996. 
 
-[3] R. S. J. D. Baker and K. Yacef, "The State of Educational Data Mining in 2009 : A Review and Future Visions," Journal of Educational Data Mining, vol. 1, no. 1, pp. 3-16, 2009.
+R. S. J. D. Baker and K. Yacef, "The State of Educational Data Mining in 2009 : A Review and Future Visions," Journal of Educational Data Mining, vol. 1, no. 1, pp. 3-16, 2009.
 
-[4] A. AL-Malaise, A. Malibari and M. Alkhozae, "STUDENTS’ PERFORMANCE PREDICTION
+A. AL-Malaise, A. Malibari and M. Alkhozae, "STUDENTS’ PERFORMANCE PREDICTION
 SYSTEM USING MULTI AGENT DATA MINING TECHNIQUE," International Journal of Data
 Mining & Knowledge Management Process (IJDKP) , vol. 4, 2014. 
 
-[8] B. Baradwaj and S. Pal, "Mining educational data to analyze student's performance," Internation Journal od Advamced Computer Science and Applications, vol. 2, no. 6, pp. 63-69, 2012.
+B. Baradwaj and S. Pal, "Mining educational data to analyze student's performance," Internation Journal od Advamced Computer Science and Applications, vol. 2, no. 6, pp. 63-69, 2012.
 
-Gerben W. Dekker1, Mykola Pechenizkiy2 and Jan M. Vleeshouwers1,Predicting Students Drop Out: A Case Study ,International Conference on Educational Data Mining (EDM) (2nd, Cordoba, Spain, Jul 1-3, 2009)
+Gerben W. Dekker1, Mykola Pechenizkiy2 and Jan M. Vleeshouwers1,Predicting Students Drop Out: A Case Study ,International Conference on Educational Data Mining (EDM) , 2nd, Cordoba, Spain, Jul 1-3, 2009.
 
-B. Baradwaj and S. Pal, "Mining educational data to analyze student's performance," Internation Journal od Advamced Computer Science and Applications, vol. 2, no. 6, pp. 63-69, 2012. 
+Cortez, P., & Silva, A., Using data mining to predict secondary school student performanc, 2008.
 
-Cortez, P., & Silva, A. (2008). Using data mining to predict secondary school student performanc
+Kotsiantis S., Pierrakeas C. and Pintelas P., Predicting Students’ Performance in Distance Learning Using Machine Learning Techniques. Applied Artificial Intelligence (AAI), 18, no. 5, 411–426, 2004.
 
-Kotsiantis S.; Pierrakeas C.; and Pintelas P., Predicting Students’ Performance in Distance Learning Using Machine Learning Techniques. Applied Artificial Intelligence (AAI), 18, no. 5, 411–426,2004.
+Pyke, S. W., & Sheridan, P. M., Logistic regression analysis of graduate student retention.Canadian Journal of Higher Education,23, 44–64, 1993.
 
-Pyke, S. W., & Sheridan, P. M. (1993). Logistic regression analysis of graduate student retention.Canadian Journal of Higher Education,23, 44–64.
+Fletcher, J., and Stren, R., Discussion of the factors influencing time to completion in graduate programs: Student views. In C. Filteau (ed.), Graduate Graduation Rates and Time to Completion: Colloquium Proceedings (pp. 17-48). Toronto: Council of Ontario Universities, 1992.
 
-Fletcher, J., and Stren, R. (1992). Discussion of the factors influencing time to completion in graduate programs: Student views. In C. Filteau (ed.), Graduate Graduation Rates and Time to Completion: Colloquium Proceedings (pp. 17±48). Toronto: Council of Ontario Universities.
+Andrew P Bradle, Pattern Recognition, 30(7), pp. 1145-1159, 1997.
 
-Andrew P Bradle（1997）,Pattern Recognition, 30(7), pp. 1145-1159.
+Nitesh V. Chawla,Kevin W. Bowyer,Lawrence O. Hall,W. Philip Kegelmeyer,SMOTE: Synthetic Minority Over-sampling Technique,Journal of Artificial Intelligence Research 16 , 321–357, 2002.
 
-
-Nitesh V. Chawla,Kevin W. Bowyer,Lawrence O. Hall,W. Philip Kegelmeyer,SMOTE: Synthetic Minority Over-sampling Technique,Journal of Artificial Intelligence Research 16 (2002) 321–357
-
-Breiman, L., Friedman, J.H., Olshen, R.A., and Stone, C.J. (1984) Classification and
-Regression Trees, Wadsworth, Belmont, CA. Republished by CRC Press.
+Breiman, L., Friedman, J.H., Olshen, R.A., and Stone, C.J., Classification and
+Regression Trees, Wadsworth, Belmont, CA. Republished by CRC Press, 1984.
  
+Breiman, L., Random Forests. Machine learning, 45(1), 5-32, 2001.
 
-林士翔,2008,營造業違約邊界之研究
+Hoerl A.E. and Kennard. R.W. Ridge regression: Biased estimation for nonorthogonal problems. Technometrics, 12(3):55-67, 1970.
 
+S. R. Gunn, “Support Vector machines for classification and regression,” Technical
+Repor,t University of Southampton, 1998. 
 
-Breiman, L. (2001). Random Forests. Machine learning, 45(1), 5-32.
+V.Vapnik.,Statistical Learning Theory ,John Wiley & Sons, New York, 1998.
 
-[9]Hoerl A.E. and Kennard. R.W. Ridge regression: Biased estimation for nonorthogonal problems. Technometrics, 12(3):55-67, 1970.
+V.Vapnik.,The Nature of Statistical Learning Theory,2nd edition, Springer- Verlag, New York, 1999.
 
+C. W. Hsu, C. C. Chang & C. J. Lin, A practical guide to support vector
+classification, 2003.
 
+McCulloch W., Pitts W., A logical calculus of the ideas immanent in nervous activity. Bulletin of Mathmetical, 5, 115-133, 1943.
 
-
-
-
-
-
-
-
-
-
+Rumelhart D., McClelland J., Psychological and Biological Models, 1986.
 
 
 
@@ -1605,9 +1676,6 @@ Breiman, L. (2001). Random Forests. Machine learning, 45(1), 5-32.
 
 
 
-
-
-）
 
 
 
