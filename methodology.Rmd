@@ -1,0 +1,31 @@
+---
+title: "研究方法"
+author: "林茂廷"
+date: "7/30/2019"
+output:
+  word_document: default
+  html_document: default
+---
+
+令$\mathbf{x}_i\in \mathbf{R}^d$，而$\hat{y}_i\in \{0,1\}$, 此分類問題為找尋一個函數映射關係
+$$
+\mathcal{M}(\mathbf{x}_i \ |\ \theta):\ \mathbf{x}_i\in \mathbf{R}^d\rightarrow\{0,1\},
+$$
+估算其中的模型參數$\theta$得到其估計值$\hat{\theta}$後，並以此估計後之模型，以$\hat{y}_i=\mathcal{M}(\mathbf{x}_i |\hat{\theta})$產生預測結果。
+
+本研究使用四種函數模型進行預測估算，分別是：羅吉斯迴歸、隨機森林、支持向量機、人工神經網路。又隨機森林模型使用了決策樹樹型，故於以下小節我們針對這五種模型一一進行介紹。
+
+令$p_i$為學生$i$於當學期會被21的機率，即$p_i=\Pr(Y=1|X=x_i)$。羅吉斯迴歸假設此機率為如下函數形式：
+
+預測方式為：
+$$
+\hat{Y}_i=\left\{\begin{matrix}1&\mbox{若}\ {p_i}\geq c\\0&\mbox{若}\ {p_i}< c.\\\end{matrix}\right.
+$$
+$c$為門檻值，若21的機率高於此門檻值便預測該學生會為被二一，若低於此值則為預測不會被二一。對應到$\mathcal{M}(x_i|\theta)$表示，此模型的參數為$\theta=\{\beta,c\}$。
+
+ANN為一種透雙層函數映射來捉捕預測函數的非線性特質，其將預測模型函數設定成：
+
+$$
+\mathcal{M}(\mathbf{x}_i \ |\ \theta)=f(g(\mathbf{x}_i))，
+$$
+進一步可再表示成：

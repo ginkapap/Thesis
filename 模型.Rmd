@@ -2,7 +2,9 @@
 title: "Untitled"
 author: "林茂廷"
 date: "6/10/2019"
-output: html_document
+output:
+  word_document: default
+  html_document: default
 ---
 
 ## 分類問題
@@ -124,3 +126,35 @@ $$
     0  & \text{otherwise.} 
   \end{cases}
 $$
+
+$$
+\begin{array}{lcl}
+\max_{w,b}&& M\\
+s.t. && y_i(w^Tx_i+b)>M(1-\epsilon_i)\\
+&& \epsilon_i\geq 0,\ \sum_i\epsilon_i\leq C\ \mbox{for }i\in S_{train}
+\end{array}
+$$
+
+
+
+$$
+\begin{array}{lcl}
+\max_{w,b}&& M\\
+s.t. && y_i(w^T\sum_{j\in S_{train}}k(x_i,x_j|\gamma)+b)>M(1-\epsilon_i)\\
+&& \epsilon_i\geq 0,\ \sum_i\epsilon_i\leq C\ \mbox{for }i\in S_{train}
+\end{array}
+$$
+
+
+```{r}
+compare <- list()
+compare$errorRate_logistic=(29+2885)/(10678)
+compare$errorRate_randomForest=(36+1639)/(10678)
+
+compare$balaceAccuracy_logistic=(157/(157+29)+7607/(2885+7607))/2
+compare$balaceAccuracy_randomForest=(150/(150+36)+8857/(1639+8853))/2
+
+compare$captureRate_logistic=157/(157+29)
+compare$captureRate_randomFores=150/(150+36)
+compare
+```
